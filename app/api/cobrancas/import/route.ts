@@ -63,8 +63,9 @@ export async function POST(request: NextRequest) {
             .select('id')
             .single()
           if (error) throw new Error(`empresa "${empresaNome}": ${error.message}`)
-          empresaId = created.id
+          empresaId = created.id as string
         }
+        if (!empresaId) throw new Error(`Não foi possível processar empresa "${empresaNome}"`)
         empresaCache.set(empresaKey, empresaId)
       }
 
@@ -88,8 +89,9 @@ export async function POST(request: NextRequest) {
             .select('id')
             .single()
           if (error) throw new Error(`loja "${lojaNome}": ${error.message}`)
-          lojaId = created.id
+          lojaId = created.id as string
         }
+        if (!lojaId) throw new Error(`Não foi possível processar loja "${lojaNome}"`)
         lojaCache.set(lojaKey, lojaId)
       }
 
