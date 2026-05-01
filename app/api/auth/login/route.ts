@@ -3,6 +3,15 @@ import bcrypt from 'bcryptjs'
 import { cookies } from 'next/headers'
 import { supabase } from '@/lib/supabase'
 import { signToken } from '@/lib/jwt'
+import { checkRateLimit, recordFailedAttempt, clearAttempts } from '@/lib/rateLimit'
+
+function getRateLimitKey(request: NextRequest, email: string): string {
+  const ip =
+    request.headers.get('x-forwarded-for')?.split(',')[0].trim() ??
+    request.headers.get('x-real-ip') ??
+    'unknown'
+  return `login:${ip}:${email}`
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,6 +23,16 @@ export async function POST(request: NextRequest) {
     }
 
     const normalizedEmail = email.trim().toLowerCase()
+    const rlKey = getRateLimitKey(request, normalizedEmail)
+
+    const { allowed, retryAfterSecs } = checkRateLimit(rlKey)
+    if (!allowed) {
+      const mins = Math.ceil(retryAfterSecs / 60)
+      return Response.json(
+        { error: `Muitas tentativas. Tente novamente em ${mins} minuto${mins > 1 ? 's' : ''}.` },
+        { status: 429, headers: { 'Retry-After': String(retryAfterSecs) } }
+      )
+    }
 
     const { data: user } = await supabase
       .from('users')
@@ -22,13 +41,17 @@ export async function POST(request: NextRequest) {
       .maybeSingle()
 
     if (!user) {
+      recordFailedAttempt(rlKey)
       return Response.json({ error: 'E-mail ou senha incorretos' }, { status: 401 })
     }
 
     const validPassword = await bcrypt.compare(password, user.password_hash)
     if (!validPassword) {
+      recordFailedAttempt(rlKey)
       return Response.json({ error: 'E-mail ou senha incorretos' }, { status: 401 })
     }
+
+    clearAttempts(rlKey)
 
     const token = signToken({ userId: user.id, email: user.email })
 
