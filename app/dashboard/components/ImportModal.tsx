@@ -50,7 +50,6 @@ function parseFile(file: File): Promise<ImportRow[]> {
           return
         }
 
-        // Map header keys
         const firstRow = raw[0]
         const headerMap: Record<string, keyof ImportRow> = {}
         for (const key of Object.keys(firstRow)) {
@@ -147,11 +146,11 @@ export default function ImportModal({ onClose, onImported }: ImportModalProps) {
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <div
-        className="w-full max-w-2xl rounded-2xl p-6"
+        className="w-full max-w-2xl rounded-2xl p-4 sm:p-6"
         style={{ background: '#0d0d1f', border: '1px solid #1e1b4b', boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-5 sm:mb-6">
           <div>
             <h3 className="text-base font-bold" style={{ color: '#f8fafc' }}>Importar Planilha</h3>
             <p className="text-xs mt-0.5" style={{ color: '#7c6fa0' }}>
@@ -175,7 +174,7 @@ export default function ImportModal({ onClose, onImported }: ImportModalProps) {
         {step === 'upload' && (
           <div className="space-y-4">
             <div
-              className="rounded-xl p-10 text-center cursor-pointer transition-all"
+              className="rounded-xl p-8 sm:p-10 text-center cursor-pointer transition-all"
               style={{
                 border: `2px dashed ${dragging ? '#7c3aed' : '#2d2b4e'}`,
                 background: dragging ? 'rgba(124,58,237,0.06)' : 'transparent',
@@ -197,7 +196,8 @@ export default function ImportModal({ onClose, onImported }: ImportModalProps) {
                 </div>
                 <div>
                   <p className="text-sm font-medium" style={{ color: '#e2e8f0' }}>
-                    Arraste o arquivo ou <span style={{ color: '#a78bfa' }}>clique para selecionar</span>
+                    Arraste o arquivo ou{' '}
+                    <span style={{ color: '#a78bfa' }}>clique para selecionar</span>
                   </p>
                   <p className="text-xs mt-1" style={{ color: '#4b5563' }}>
                     A planilha deve ter as colunas: CLIENTE · EMPRESA · LOJA · VENDEDOR · OBSERVAÇÃO
@@ -224,8 +224,11 @@ export default function ImportModal({ onClose, onImported }: ImportModalProps) {
         {/* ── PREVIEW ── */}
         {step === 'preview' && (
           <div className="space-y-4">
-            <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #1e1b4b', maxHeight: 320, overflowY: 'auto' }}>
-              <table className="w-full text-sm">
+            <div
+              className="rounded-xl overflow-auto"
+              style={{ border: '1px solid #1e1b4b', maxHeight: 320 }}
+            >
+              <table className="w-full text-sm" style={{ minWidth: 480 }}>
                 <thead style={{ background: '#12122a', position: 'sticky', top: 0 }}>
                   <tr>
                     {['Cliente', 'Empresa', 'Loja', 'Vendedor', 'Observação'].map((h) => (
@@ -238,10 +241,10 @@ export default function ImportModal({ onClose, onImported }: ImportModalProps) {
                 <tbody style={{ background: '#08080f' }}>
                   {rows.map((row, i) => (
                     <tr key={i} style={{ borderBottom: '1px solid #1a1a2e' }}>
-                      <td className="py-2 px-3" style={{ color: '#f8fafc' }}>{row.cliente || <span style={{ color: '#4b5563' }}>—</span>}</td>
-                      <td className="py-2 px-3" style={{ color: '#c4b5fd' }}>{row.empresa || <span style={{ color: '#4b5563' }}>—</span>}</td>
-                      <td className="py-2 px-3" style={{ color: '#a78bfa' }}>{row.loja || <span style={{ color: '#4b5563' }}>—</span>}</td>
-                      <td className="py-2 px-3" style={{ color: '#e2e8f0' }}>{row.vendedor || <span style={{ color: '#4b5563' }}>—</span>}</td>
+                      <td className="py-2 px-3 whitespace-nowrap" style={{ color: '#f8fafc' }}>{row.cliente || <span style={{ color: '#4b5563' }}>—</span>}</td>
+                      <td className="py-2 px-3 whitespace-nowrap" style={{ color: '#c4b5fd' }}>{row.empresa || <span style={{ color: '#4b5563' }}>—</span>}</td>
+                      <td className="py-2 px-3 whitespace-nowrap" style={{ color: '#a78bfa' }}>{row.loja || <span style={{ color: '#4b5563' }}>—</span>}</td>
+                      <td className="py-2 px-3 whitespace-nowrap" style={{ color: '#e2e8f0' }}>{row.vendedor || <span style={{ color: '#4b5563' }}>—</span>}</td>
                       <td className="py-2 px-3 max-w-xs truncate" style={{ color: '#7c6fa0' }}>{row.observacao || <span style={{ color: '#4b5563' }}>—</span>}</td>
                     </tr>
                   ))}
@@ -272,7 +275,11 @@ export default function ImportModal({ onClose, onImported }: ImportModalProps) {
         {/* ── RESULT ── */}
         {step === 'result' && result && (
           <div className="space-y-4">
-            <div className="rounded-xl p-5 flex items-start gap-4" style={{ background: result.imported > 0 ? 'rgba(124,58,237,0.08)' : 'rgba(239,68,68,0.08)', border: `1px solid ${result.imported > 0 ? 'rgba(124,58,237,0.2)' : 'rgba(239,68,68,0.2)'}` }}>
+            <div className="rounded-xl p-4 sm:p-5 flex items-start gap-4"
+              style={{
+                background: result.imported > 0 ? 'rgba(124,58,237,0.08)' : 'rgba(239,68,68,0.08)',
+                border: `1px solid ${result.imported > 0 ? 'rgba(124,58,237,0.2)' : 'rgba(239,68,68,0.2)'}`,
+              }}>
               <div
                 className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
                 style={{ background: result.imported > 0 ? 'rgba(124,58,237,0.15)' : 'rgba(239,68,68,0.15)' }}

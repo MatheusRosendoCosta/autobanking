@@ -90,7 +90,7 @@ function TextareaField({
 
 function EmptyState({ onNew }: { onNew: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center py-24 gap-4">
+    <div className="flex flex-col items-center justify-center py-16 md:py-24 gap-4">
       <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
         style={{ background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.2)' }}>
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
@@ -112,19 +112,9 @@ function EmptyState({ onNew }: { onNew: () => void }) {
   )
 }
 
-// ─── CobrancaRow ───────────────────────────────────────────────────────────────
+// ─── Shared row props ──────────────────────────────────────────────────────────
 
-function CobrancaRow({
-  cobranca,
-  editing,
-  editValue,
-  saving,
-  onEditStart,
-  onEditChange,
-  onEditSave,
-  onEditCancel,
-  onDelete,
-}: {
+interface RowProps {
   cobranca: Cobranca
   editing: boolean
   editValue: string
@@ -134,7 +124,14 @@ function CobrancaRow({
   onEditSave: () => void
   onEditCancel: () => void
   onDelete: (id: string) => void
-}) {
+}
+
+// ─── CobrancaRow (desktop table) ──────────────────────────────────────────────
+
+function CobrancaRow({
+  cobranca, editing, editValue, saving,
+  onEditStart, onEditChange, onEditSave, onEditCancel, onDelete,
+}: RowProps) {
   const [confirming, setConfirming] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [hovered, setHovered] = useState(false)
@@ -256,6 +253,132 @@ function CobrancaRow({
   )
 }
 
+// ─── CobrancaCard (mobile) ─────────────────────────────────────────────────────
+
+function CobrancaCard({
+  cobranca, editing, editValue, saving,
+  onEditStart, onEditChange, onEditSave, onEditCancel, onDelete,
+}: RowProps) {
+  const [confirming, setConfirming] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (editing) textareaRef.current?.focus()
+  }, [editing])
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    try {
+      await fetch(`/api/cobrancas/${cobranca.id}`, { method: 'DELETE' })
+      onDelete(cobranca.id)
+    } finally {
+      setDeleting(false)
+      setConfirming(false)
+    }
+  }
+
+  return (
+    <div className="p-4" style={{ borderBottom: '1px solid #1e1b4b', background: '#08080f' }}>
+      {/* Top: loja + date + delete */}
+      <div className="flex items-start justify-between mb-2">
+        <span className="text-xs font-semibold" style={{ color: '#a78bfa' }}>
+          {cobranca.loja?.nome ?? '—'}
+        </span>
+        <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+          <span className="text-xs" style={{ color: '#4b5563' }}>
+            {new Date(cobranca.created_at).toLocaleDateString('pt-BR')}
+          </span>
+          {confirming ? (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="text-xs px-2 py-0.5 rounded-lg font-medium cursor-pointer disabled:opacity-50"
+                style={{ background: 'rgba(239,68,68,0.15)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.3)' }}
+              >
+                {deleting ? '...' : 'Confirmar'}
+              </button>
+              <button
+                onClick={() => setConfirming(false)}
+                className="text-xs cursor-pointer"
+                style={{ color: '#4b5563' }}
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirming(true)}
+              className="text-xs px-2 py-0.5 rounded-lg cursor-pointer"
+              style={{ color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)' }}
+            >
+              Excluir
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Cliente + Vendedor */}
+      <p className="font-semibold text-sm mb-0.5" style={{ color: '#f8fafc' }}>
+        {cobranca.cliente}
+      </p>
+      <p className="text-sm mb-3" style={{ color: '#e2e8f0' }}>
+        {cobranca.vendedor}
+      </p>
+
+      {/* Observação */}
+      {editing ? (
+        <div className="space-y-1.5">
+          <textarea
+            ref={textareaRef}
+            value={editValue}
+            onChange={(e) => onEditChange(e.target.value)}
+            rows={2}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onEditSave() }
+              if (e.key === 'Escape') onEditCancel()
+            }}
+            className="w-full px-3 py-1.5 rounded-lg text-sm text-white outline-none resize-none"
+            style={{ background: '#12122a', border: '1.5px solid #7c3aed', boxShadow: '0 0 0 3px rgba(124,58,237,0.12)' }}
+          />
+          <div className="flex gap-1.5">
+            <button
+              onClick={onEditSave}
+              disabled={saving}
+              className="text-xs px-2.5 py-1 rounded-lg font-medium cursor-pointer disabled:opacity-50"
+              style={{ background: 'rgba(124,58,237,0.2)', color: '#a78bfa', border: '1px solid rgba(124,58,237,0.3)' }}
+            >
+              {saving ? '...' : 'Salvar'}
+            </button>
+            <button
+              onClick={onEditCancel}
+              className="text-xs px-2.5 py-1 rounded-lg cursor-pointer"
+              style={{ color: '#4b5563' }}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={onEditStart}
+          className="w-full rounded-lg px-3 py-2.5 text-left cursor-pointer"
+          style={{ background: '#0d0d1f', border: '1px solid #1e1b4b' }}
+        >
+          <p className="text-xs font-semibold uppercase tracking-wider mb-0.5" style={{ color: '#4b5563' }}>
+            Observação
+          </p>
+          <p className="text-sm" style={{ color: cobranca.observacao ? '#7c6fa0' : '#2d2b4e' }}>
+            {cobranca.observacao || 'Toque para adicionar...'}
+          </p>
+        </button>
+      )}
+    </div>
+  )
+}
+
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 function saudacao(): string {
@@ -276,11 +399,11 @@ function buildWhatsappMessage(items: Cobranca[]): string {
 
   const lojas = Array.from(byLoja.values()).sort((a, b) => a.nome.localeCompare(b.nome))
 
-  let msg = `${saudacao()} pessoal, tudo bem?\n\nEstamos com os seguintes casos aguardando.\n`
+  let msg = `${saudacao()} pessoal, tudo bem? 🙏🏼\n\nEstamos com os seguintes casos aguardando.\n`
   for (const loja of lojas) {
     msg += `\n*${loja.nome}*\n\n`
     for (const c of loja.items) {
-      msg += `Cliente - ${c.cliente}\nVendedor - ${c.vendedor}\n\n`
+      msg += `👤Cliente - ${c.cliente}\nVendedor - ${c.vendedor}\n\n`
     }
   }
 
@@ -316,28 +439,40 @@ function EmpresaGroup({
     })
   }
 
+  const rowProps = (c: Cobranca) => ({
+    cobranca: c,
+    editing: editingId === c.id,
+    editValue,
+    saving: savingId === c.id,
+    onEditStart: () => onEditStart(c),
+    onEditChange,
+    onEditSave,
+    onEditCancel,
+    onDelete,
+  })
+
   return (
     <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid #1e1b4b' }}>
       {/* Empresa header */}
       <div
-        className="flex items-center justify-between px-5 py-3.5 cursor-pointer"
+        className="flex items-center justify-between px-4 md:px-5 py-3 md:py-3.5 cursor-pointer"
         style={{ background: '#0d0d1f' }}
         onClick={() => setCollapsed((v) => !v)}
       >
-        <div className="flex items-center gap-3">
-          <span className="font-semibold text-sm" style={{ color: '#f8fafc' }}>{empresaNome}</span>
-          <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+        <div className="flex items-center gap-2 md:gap-3 min-w-0">
+          <span className="font-semibold text-sm truncate" style={{ color: '#f8fafc' }}>{empresaNome}</span>
+          <span className="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0"
             style={{ background: 'rgba(124,58,237,0.15)', color: '#a78bfa' }}>
-            {items.length} cobrança{items.length !== 1 ? 's' : ''}
+            {items.length}
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           {/* Copy WhatsApp message */}
           <button
             type="button"
             onClick={handleCopy}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all"
+            className="flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all"
             style={{
               color: copied ? '#4ade80' : '#7c6fa0',
               border: `1px solid ${copied ? 'rgba(74,222,128,0.3)' : '#2d2b4e'}`,
@@ -363,7 +498,7 @@ function EmpresaGroup({
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
                   <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                Copiado!
+                <span className="hidden sm:inline">Copiado!</span>
               </>
             ) : (
               <>
@@ -371,7 +506,7 @@ function EmpresaGroup({
                   <path d="M22 16.74V4.67C22 3.47 21.02 2.5 19.82 2.5H9.18C7.98 2.5 7 3.47 7 4.67V16.74C7 17.94 7.98 18.91 9.18 18.91H19.82C21.02 18.91 22 17.94 22 16.74Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                   <path d="M17 18.91V20.5C17 21.05 16.55 21.5 16 21.5H4C3.45 21.5 3 21.05 3 20.5V8.5C3 7.95 3.45 7.5 4 7.5H7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                 </svg>
-                Copiar mensagem
+                <span className="hidden sm:inline">Copiar mensagem</span>
               </>
             )}
           </button>
@@ -386,36 +521,36 @@ function EmpresaGroup({
         </div>
       </div>
 
-      {/* Table */}
+      {/* Mobile cards */}
       {!collapsed && (
-        <table className="w-full">
-          <thead style={{ background: '#0a0a1a' }}>
-            <tr>
-              {['Loja', 'Cliente', 'Vendedor', 'Observação', 'Data', ''].map((h) => (
-                <th key={h} className="py-2.5 px-4 text-left text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: '#4b5563', borderTop: '1px solid #1e1b4b' }}>
-                  {h}
-                </th>
+        <div className="md:hidden">
+          {items.map((c) => (
+            <CobrancaCard key={c.id} {...rowProps(c)} />
+          ))}
+        </div>
+      )}
+
+      {/* Desktop table */}
+      {!collapsed && (
+        <div className="hidden md:block">
+          <table className="w-full">
+            <thead style={{ background: '#0a0a1a' }}>
+              <tr>
+                {['Loja', 'Cliente', 'Vendedor', 'Observação', 'Data', ''].map((h) => (
+                  <th key={h} className="py-2.5 px-4 text-left text-xs font-semibold uppercase tracking-wider"
+                    style={{ color: '#4b5563', borderTop: '1px solid #1e1b4b' }}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody style={{ background: '#08080f' }}>
+              {items.map((c) => (
+                <CobrancaRow key={c.id} {...rowProps(c)} />
               ))}
-            </tr>
-          </thead>
-          <tbody style={{ background: '#08080f' }}>
-            {items.map((c) => (
-              <CobrancaRow
-                key={c.id}
-                cobranca={c}
-                editing={editingId === c.id}
-                editValue={editValue}
-                saving={savingId === c.id}
-                onEditStart={() => onEditStart(c)}
-                onEditChange={onEditChange}
-                onEditSave={onEditSave}
-                onEditCancel={onEditCancel}
-                onDelete={onDelete}
-              />
-            ))}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )
@@ -550,7 +685,7 @@ export default function CobrancaSection() {
   return (
     <div>
       {/* Section header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 md:mb-6 gap-3">
         <div>
           <h2 className="text-lg font-bold" style={{ color: '#f8fafc' }}>Cobrança</h2>
           <p className="text-sm mt-0.5" style={{ color: '#7c6fa0' }}>
@@ -559,7 +694,7 @@ export default function CobrancaSection() {
               : `${cobrancas.length} cobrança${cobrancas.length > 1 ? 's' : ''} em ${grouped.length} empresa${grouped.length > 1 ? 's' : ''}`}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setImportOpen(true)}
             className="px-4 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all"
@@ -609,9 +744,11 @@ export default function CobrancaSection() {
           style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
           onClick={(e) => { if (e.target === e.currentTarget) closeModal() }}
         >
-          <div className="w-full max-w-lg rounded-2xl p-6"
-            style={{ background: '#0d0d1f', border: '1px solid #1e1b4b', boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
-            <div className="flex items-center justify-between mb-6">
+          <div
+            className="w-full max-w-lg rounded-2xl p-4 sm:p-6"
+            style={{ background: '#0d0d1f', border: '1px solid #1e1b4b', boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}
+          >
+            <div className="flex items-center justify-between mb-5 sm:mb-6">
               <h3 className="text-base font-bold" style={{ color: '#f8fafc' }}>Nova Cobrança</h3>
               <button onClick={closeModal} className="text-xl leading-none cursor-pointer" style={{ color: '#4b5563' }}
                 onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = '#f8fafc')}
@@ -624,7 +761,7 @@ export default function CobrancaSection() {
               <InputField label="Cliente" value={form.cliente}
                 onChange={(v) => setForm((f) => ({ ...f, cliente: v }))} placeholder="Nome do cliente" />
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <SelectOrCreate label="Empresa" options={empresas} selected={form.empresa}
                   onSelect={handleEmpresaSelect} onCreate={handleCreateEmpresa}
                   placeholder="Selecionar empresa..." />
