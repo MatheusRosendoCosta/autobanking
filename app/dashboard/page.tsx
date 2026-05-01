@@ -25,20 +25,152 @@ function AutoBankingLogo() {
   )
 }
 
+function HamburgerIcon({ open }: { open: boolean }) {
+  return open ? (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <path d="M18 6L6 18M6 6L18 18" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  ) : (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <path d="M3 12H21M3 6H21M3 18H21" stroke="#7c6fa0" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const [form, setForm] = useState({ current: '', next: '', confirm: '' })
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setError('')
+    setSuccess('')
+
+    if (!form.current || !form.next || !form.confirm) {
+      setError('Preencha todos os campos.')
+      return
+    }
+    if (form.next !== form.confirm) {
+      setError('A nova senha e a confirmação não coincidem.')
+      return
+    }
+    if (form.next.length < 8) {
+      setError('A nova senha deve ter pelo menos 8 caracteres.')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: form.current, newPassword: form.next }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error ?? 'Erro ao alterar senha.')
+      } else {
+        setSuccess('Senha alterada com sucesso!')
+        setForm({ current: '', next: '', confirm: '' })
+      }
+    } catch {
+      setError('Erro de conexão. Tente novamente.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.7)' }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm rounded-2xl p-6 space-y-5"
+        style={{ background: '#0d0d1f', border: '1px solid #1e1b4b' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <h2 className="text-base font-bold" style={{ color: '#f8fafc' }}>Alterar Senha</h2>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {(['current', 'next', 'confirm'] as const).map((field) => (
+            <div key={field} className="space-y-1">
+              <label className="text-xs font-medium" style={{ color: '#7c6fa0' }}>
+                {field === 'current' ? 'Senha atual' : field === 'next' ? 'Nova senha' : 'Confirmar nova senha'}
+              </label>
+              <input
+                type="password"
+                value={form[field]}
+                onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
+                className="w-full rounded-lg px-3 py-2.5 text-sm outline-none"
+                style={{ background: '#08080f', border: '1px solid #1e1b4b', color: '#f8fafc' }}
+              />
+            </div>
+          ))}
+
+          {error && (
+            <p className="text-xs rounded-lg px-3 py-2" style={{ background: 'rgba(239,68,68,0.1)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.2)' }}>
+              {error}
+            </p>
+          )}
+          {success && (
+            <p className="text-xs rounded-lg px-3 py-2" style={{ background: 'rgba(34,197,94,0.1)', color: '#86efac', border: '1px solid rgba(34,197,94,0.2)' }}>
+              {success}
+            </p>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-lg text-sm font-medium cursor-pointer"
+              style={{ color: '#7c6fa0', border: '1px solid #1e1b4b', background: 'transparent' }}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 py-2.5 rounded-lg text-sm font-medium cursor-pointer"
+              style={{
+                background: loading ? '#4c1d95' : 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)',
+                color: '#f8fafc',
+                border: 'none',
+                opacity: loading ? 0.7 : 1,
+              }}
+            >
+              {loading ? 'Salvando...' : 'Salvar'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const [active, setActive] = useState<Section>('cobranca')
+  const [showChangePassword, setShowChangePassword] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
     router.push('/login')
   }
 
+  const closeMenu = () => setMenuOpen(false)
+
   return (
     <div className="min-h-screen" style={{ background: '#08080f' }}>
+      {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
+
       {/* Header */}
       <header
-        className="sticky top-0 z-50 flex items-center justify-between px-6 h-16"
+        className="sticky top-0 z-50 flex items-center justify-between px-4 md:px-6 h-16"
         style={{
           background: '#0d0d1f',
           borderBottom: '1px solid #1e1b4b',
@@ -48,7 +180,7 @@ export default function DashboardPage() {
         {/* Logo */}
         <div className="flex items-center gap-2.5">
           <div
-            className="flex items-center justify-center w-9 h-9 rounded-xl"
+            className="flex items-center justify-center w-9 h-9 rounded-xl flex-shrink-0"
             style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)' }}
           >
             <AutoBankingLogo />
@@ -58,8 +190,8 @@ export default function DashboardPage() {
           </span>
         </div>
 
-        {/* Nav */}
-        <nav className="flex items-center gap-1">
+        {/* Nav — desktop only */}
+        <nav className="hidden md:flex items-center gap-1">
           {NAV_ITEMS.map((item) => (
             <button
               key={item.id}
@@ -76,28 +208,107 @@ export default function DashboardPage() {
           ))}
         </nav>
 
-        {/* Logout */}
+        {/* Actions — desktop only */}
+        <div className="hidden md:flex items-center gap-2">
+          <button
+            onClick={() => setShowChangePassword(true)}
+            className="px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer"
+            style={{ color: '#a78bfa', border: '1px solid rgba(124,58,237,0.25)', background: 'transparent' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(124,58,237,0.10)' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
+          >
+            Alterar Senha
+          </button>
+
+          <button
+            onClick={handleLogout}
+            className="px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer"
+            style={{ color: '#7c6fa0', border: '1px solid #1e1b4b', background: 'transparent' }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLButtonElement).style.color = '#fca5a5'
+              ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(239,68,68,0.3)'
+              ;(e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.08)'
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLButtonElement).style.color = '#7c6fa0'
+              ;(e.currentTarget as HTMLButtonElement).style.borderColor = '#1e1b4b'
+              ;(e.currentTarget as HTMLButtonElement).style.background = 'transparent'
+            }}
+          >
+            Encerrar Sessão
+          </button>
+        </div>
+
+        {/* Hamburger — mobile only */}
         <button
-          onClick={handleLogout}
-          className="px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer"
-          style={{ color: '#7c6fa0', border: '1px solid #1e1b4b' }}
-          onMouseEnter={e => {
-            (e.currentTarget as HTMLButtonElement).style.color = '#fca5a5'
-            ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(239,68,68,0.3)'
-            ;(e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.08)'
+          onClick={() => setMenuOpen(v => !v)}
+          className="md:hidden flex items-center justify-center w-9 h-9 rounded-lg cursor-pointer transition-all"
+          style={{
+            border: '1px solid #1e1b4b',
+            background: menuOpen ? 'rgba(124,58,237,0.1)' : 'transparent',
           }}
-          onMouseLeave={e => {
-            (e.currentTarget as HTMLButtonElement).style.color = '#7c6fa0'
-            ;(e.currentTarget as HTMLButtonElement).style.borderColor = '#1e1b4b'
-            ;(e.currentTarget as HTMLButtonElement).style.background = 'transparent'
-          }}
+          aria-label="Menu"
         >
-          Sair
+          <HamburgerIcon open={menuOpen} />
         </button>
       </header>
 
-      {/* Content — todos os módulos ficam montados, apenas o ativo é visível */}
-      <main className="p-8">
+      {/* Mobile menu drawer */}
+      {menuOpen && (
+        <div className="md:hidden fixed inset-0 z-40" style={{ top: 64 }}>
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0"
+            style={{ background: 'rgba(0,0,0,0.5)' }}
+            onClick={closeMenu}
+          />
+
+          {/* Drawer */}
+          <div
+            className="relative z-10"
+            style={{ background: '#0d0d1f', borderBottom: '1px solid #1e1b4b' }}
+          >
+            {/* Nav items */}
+            <nav className="p-3 space-y-1">
+              {NAV_ITEMS.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => { setActive(item.id); closeMenu() }}
+                  className="w-full px-4 py-3 rounded-xl text-sm font-medium text-left cursor-pointer transition-all"
+                  style={{
+                    color: active === item.id ? '#a78bfa' : '#7c6fa0',
+                    background: active === item.id ? 'rgba(124,58,237,0.12)' : 'transparent',
+                    border: active === item.id ? '1px solid rgba(124,58,237,0.25)' : '1px solid transparent',
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+
+            {/* Action buttons */}
+            <div className="px-3 pb-3 space-y-2" style={{ borderTop: '1px solid #1e1b4b', paddingTop: 12 }}>
+              <button
+                onClick={() => { setShowChangePassword(true); closeMenu() }}
+                className="w-full px-4 py-3 rounded-xl text-sm font-medium text-left cursor-pointer"
+                style={{ color: '#a78bfa', border: '1px solid rgba(124,58,237,0.25)', background: 'transparent' }}
+              >
+                Alterar Senha
+              </button>
+              <button
+                onClick={handleLogout}
+                className="w-full px-4 py-3 rounded-xl text-sm font-medium text-left cursor-pointer"
+                style={{ color: '#fca5a5', border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.06)' }}
+              >
+                Encerrar Sessão
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Content */}
+      <main className="p-4 md:p-8">
         <div style={{ display: active === 'cobranca' ? 'block' : 'none' }}>
           <CobrancaSection />
         </div>
