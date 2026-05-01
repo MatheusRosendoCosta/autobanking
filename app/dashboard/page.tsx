@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import CobrancaSection from './components/CobrancaSection'
+import FloorPlanSection from './components/FloorPlanSection'
 
 type Section = 'cobranca' | 'floorplan' | 'administrativo'
 
@@ -313,8 +314,7 @@ export default function DashboardPage() {
           <CobrancaSection />
         </div>
         <div style={{ display: active === 'floorplan' ? 'block' : 'none' }}>
-          <h1 className="text-xl font-bold mb-1" style={{ color: '#f8fafc' }}>Floor Plan</h1>
-          <p className="text-sm" style={{ color: '#7c6fa0' }}>Módulo em construção...</p>
+          <FloorPlanSection />
         </div>
         <div style={{ display: active === 'administrativo' ? 'block' : 'none' }}>
           <h1 className="text-xl font-bold mb-1" style={{ color: '#f8fafc' }}>Administrativo</h1>
