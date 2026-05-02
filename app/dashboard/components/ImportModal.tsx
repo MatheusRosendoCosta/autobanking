@@ -26,13 +26,19 @@ function normalizeKey(key: string): string {
     .replace(/[̀-ͯ]/g, '')
 }
 
-const COL_MAP: Record<string, keyof ImportRow> = {
-  cliente: 'cliente',
-  empresa: 'empresa',
-  loja: 'loja',
-  vendedor: 'vendedor',
-  observacao: 'observacao',
-  observação: 'observacao',
+const KEYWORD_MAP: Array<{ keyword: string; field: keyof ImportRow }> = [
+  { keyword: 'cliente', field: 'cliente' },
+  { keyword: 'empresa', field: 'empresa' },
+  { keyword: 'loja', field: 'loja' },
+  { keyword: 'vendedor', field: 'vendedor' },
+  { keyword: 'observacao', field: 'observacao' },
+]
+
+function detectField(normalizedKey: string): keyof ImportRow | undefined {
+  for (const { keyword, field } of KEYWORD_MAP) {
+    if (normalizedKey.includes(keyword)) return field
+  }
+  return undefined
 }
 
 function parseFile(file: File): Promise<ImportRow[]> {
@@ -54,7 +60,10 @@ function parseFile(file: File): Promise<ImportRow[]> {
         const headerMap: Record<string, keyof ImportRow> = {}
         for (const key of Object.keys(firstRow)) {
           const normalized = normalizeKey(key)
-          if (COL_MAP[normalized]) headerMap[key] = COL_MAP[normalized]
+          const field = detectField(normalized)
+          if (field && !Object.values(headerMap).includes(field)) {
+            headerMap[key] = field
+          }
         }
 
         const missing = REQUIRED_COLS.filter(
@@ -200,7 +209,7 @@ export default function ImportModal({ onClose, onImported }: ImportModalProps) {
                     <span style={{ color: '#a78bfa' }}>clique para selecionar</span>
                   </p>
                   <p className="text-xs mt-1" style={{ color: '#4b5563' }}>
-                    A planilha deve ter as colunas: CLIENTE · EMPRESA · LOJA · VENDEDOR · OBSERVAÇÃO
+                    As colunas devem conter: CLIENTE · EMPRESA · LOJA · VENDEDOR · OBSERVAÇÃO (ex: "NOME VENDEDOR" é detectado automaticamente)
                   </p>
                 </div>
               </div>
