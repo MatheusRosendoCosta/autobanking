@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
-import { resolveDataUserId } from '@/lib/permissions'
+import { hasPermission } from '@/lib/permissions'
 
 async function getUserId(): Promise<string | null> {
   try {
@@ -18,14 +18,11 @@ async function getUserId(): Promise<string | null> {
 export async function GET() {
   const userId = await getUserId()
   if (!userId) return Response.json({ error: 'Não autorizado' }, { status: 401 })
-
-  const dataUserId = await resolveDataUserId(userId, 'cobranca')
-  if (!dataUserId) return Response.json({ error: 'Acesso negado' }, { status: 403 })
+  if (!(await hasPermission(userId, 'cobranca'))) return Response.json({ error: 'Acesso negado' }, { status: 403 })
 
   const { data, error } = await supabase
     .from('cobrancas')
     .select('*, empresa:empresa_id(id, nome), loja:loja_id(id, nome)')
-    .eq('user_id', dataUserId)
     .order('created_at', { ascending: false })
 
   if (error) return Response.json({ error: 'Erro ao buscar cobranças' }, { status: 500 })
@@ -36,6 +33,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const userId = await getUserId()
   if (!userId) return Response.json({ error: 'Não autorizado' }, { status: 401 })
+  if (!(await hasPermission(userId, 'cobranca'))) return Response.json({ error: 'Acesso negado' }, { status: 403 })
 
   try {
     const body = await request.json()

@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { hasPermission } from '@/lib/permissions'
 
 async function getUserId(): Promise<string | null> {
   try {
@@ -20,6 +21,7 @@ export async function PATCH(
 ) {
   const userId = await getUserId()
   if (!userId) return Response.json({ error: 'Não autorizado' }, { status: 401 })
+  if (!(await hasPermission(userId, 'cobranca'))) return Response.json({ error: 'Acesso negado' }, { status: 403 })
 
   const { id } = await params
   const { observacao } = (await request.json()) as { observacao?: string }
@@ -28,7 +30,6 @@ export async function PATCH(
     .from('cobrancas')
     .update({ observacao: observacao?.trim() ?? '' })
     .eq('id', id)
-    .eq('user_id', userId)
 
   if (error) return Response.json({ error: 'Erro ao atualizar' }, { status: 500 })
 
@@ -41,6 +42,7 @@ export async function DELETE(
 ) {
   const userId = await getUserId()
   if (!userId) return Response.json({ error: 'Não autorizado' }, { status: 401 })
+  if (!(await hasPermission(userId, 'cobranca'))) return Response.json({ error: 'Acesso negado' }, { status: 403 })
 
   const { id } = await params
 
@@ -48,7 +50,6 @@ export async function DELETE(
     .from('cobrancas')
     .delete()
     .eq('id', id)
-    .eq('user_id', userId)
 
   if (error) return Response.json({ error: 'Erro ao excluir' }, { status: 500 })
 

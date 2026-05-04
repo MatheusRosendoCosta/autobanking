@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { hasPermission } from '@/lib/permissions'
 
 async function getUserId(): Promise<string | null> {
   try {
@@ -22,6 +23,7 @@ export async function POST(
 ) {
   const userId = await getUserId()
   if (!userId) return Response.json({ error: 'Não autorizado' }, { status: 401 })
+  if (!(await hasPermission(userId, 'administrativo'))) return Response.json({ error: 'Acesso negado' }, { status: 403 })
 
   const { id } = await params
 
@@ -29,7 +31,6 @@ export async function POST(
     .from('administrativo_cards')
     .select('id')
     .eq('id', id)
-    .eq('user_id', userId)
     .single()
 
   if (!card) return Response.json({ error: 'Card não encontrado.' }, { status: 404 })

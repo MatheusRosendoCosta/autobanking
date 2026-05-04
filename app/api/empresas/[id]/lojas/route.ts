@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { hasPermission, isAdmin } from '@/lib/permissions'
 
 async function getUserId(): Promise<string | null> {
   try {
@@ -14,27 +15,15 @@ async function getUserId(): Promise<string | null> {
   }
 }
 
-async function verifyEmpresaOwnership(empresaId: string, userId: string) {
-  const { data } = await supabase
-    .from('empresas')
-    .select('id')
-    .eq('id', empresaId)
-    .eq('user_id', userId)
-    .maybeSingle()
-  return !!data
-}
-
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const userId = await getUserId()
   if (!userId) return Response.json({ error: 'Não autorizado' }, { status: 401 })
+  if (!(await hasPermission(userId, 'cobranca'))) return Response.json({ error: 'Acesso negado' }, { status: 403 })
 
   const { id: empresaId } = await params
-
-  if (!(await verifyEmpresaOwnership(empresaId, userId)))
-    return Response.json({ error: 'Empresa não encontrada' }, { status: 404 })
 
   const { data, error } = await supabase
     .from('lojas')
@@ -53,11 +42,10 @@ export async function POST(
 ) {
   const userId = await getUserId()
   if (!userId) return Response.json({ error: 'Não autorizado' }, { status: 401 })
+  // Só admin pode criar novas lojas
+  if (!(await isAdmin(userId))) return Response.json({ error: 'Acesso negado' }, { status: 403 })
 
   const { id: empresaId } = await params
-
-  if (!(await verifyEmpresaOwnership(empresaId, userId)))
-    return Response.json({ error: 'Empresa não encontrada' }, { status: 404 })
 
   const { nome } = (await request.json()) as { nome?: string }
   if (!nome?.trim()) return Response.json({ error: 'Nome é obrigatório' }, { status: 400 })

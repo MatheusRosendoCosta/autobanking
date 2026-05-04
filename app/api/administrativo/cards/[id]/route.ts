@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { hasPermission } from '@/lib/permissions'
 
 async function getUserId(): Promise<string | null> {
   try {
@@ -20,18 +21,10 @@ export async function PATCH(
 ) {
   const userId = await getUserId()
   if (!userId) return Response.json({ error: 'Não autorizado' }, { status: 401 })
+  if (!(await hasPermission(userId, 'administrativo'))) return Response.json({ error: 'Acesso negado' }, { status: 403 })
 
   const { id } = await params
   const body = await request.json() as { enviado_carne?: boolean }
-
-  const { data: card } = await supabase
-    .from('administrativo_cards')
-    .select('id')
-    .eq('id', id)
-    .eq('user_id', userId)
-    .single()
-
-  if (!card) return Response.json({ error: 'Card não encontrado.' }, { status: 404 })
 
   const { data: updated, error } = await supabase
     .from('administrativo_cards')
@@ -51,19 +44,10 @@ export async function DELETE(
 ) {
   const userId = await getUserId()
   if (!userId) return Response.json({ error: 'Não autorizado' }, { status: 401 })
+  if (!(await hasPermission(userId, 'administrativo'))) return Response.json({ error: 'Acesso negado' }, { status: 403 })
 
   const { id } = await params
 
-  const { data: card } = await supabase
-    .from('administrativo_cards')
-    .select('id')
-    .eq('id', id)
-    .eq('user_id', userId)
-    .single()
-
-  if (!card) return Response.json({ error: 'Card não encontrado.' }, { status: 404 })
-
-  // Remove arquivos do storage antes de deletar o card
   const { data: arquivos } = await supabase
     .from('administrativo_arquivos')
     .select('bucket_path')
