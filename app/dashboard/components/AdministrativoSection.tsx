@@ -13,6 +13,7 @@ interface Arquivo {
   tipo: Tipo
   nome: string
   tamanho: number
+  checked: boolean
   created_at: string
 }
 
@@ -44,13 +45,16 @@ function formatSize(bytes: number): string {
 
 // ─── FileRow ───────────────────────────────────────────────────────────────────
 
-function FileRow({ arquivo, color, onDelete, readonly }: {
+function FileRow({ arquivo, color, onDelete, onCheckChange, readonly }: {
   arquivo: Arquivo
   color: string
   onDelete?: (id: string) => void
+  onCheckChange?: (id: string, checked: boolean) => void
   readonly?: boolean
 }) {
   const [deleting, setDeleting] = useState(false)
+  const [checked, setChecked] = useState(arquivo.checked)
+  const [savingCheck, setSavingCheck] = useState(false)
 
   const handleView = async () => {
     const res = await fetch(`/api/administrativo/arquivos/${arquivo.id}/view`)
@@ -69,13 +73,31 @@ function FileRow({ arquivo, color, onDelete, readonly }: {
     }
   }
 
+  const handleCheck = async () => {
+    const newVal = !checked
+    setChecked(newVal)
+    setSavingCheck(true)
+    try {
+      await fetch(`/api/administrativo/arquivos/${arquivo.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ checked: newVal }),
+      })
+      onCheckChange?.(arquivo.id, newVal)
+    } catch {
+      setChecked(!newVal)
+    } finally {
+      setSavingCheck(false)
+    }
+  }
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.25)', borderRadius: 7, padding: '6px 8px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: checked ? 'rgba(52,211,153,0.06)' : 'rgba(0,0,0,0.25)', borderRadius: 7, padding: '6px 8px', transition: 'background 0.2s' }}>
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
-        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke={color} strokeWidth="1.6" fill="none" />
-        <path d="M14 2v6h6" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke={checked ? '#34d399' : color} strokeWidth="1.6" fill="none" />
+        <path d="M14 2v6h6" stroke={checked ? '#34d399' : color} strokeWidth="1.6" strokeLinecap="round" />
       </svg>
-      <span style={{ flex: 1, fontSize: 11, color: '#f8fafc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={arquivo.nome}>
+      <span style={{ flex: 1, fontSize: 11, color: checked ? '#a3e6c8' : '#f8fafc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: checked ? 'line-through' : 'none', opacity: checked ? 0.7 : 1 }} title={arquivo.nome}>
         {arquivo.nome}
       </span>
       <span style={{ fontSize: 10, color: '#4a4568', whiteSpace: 'nowrap' }}>{formatSize(arquivo.tamanho)}</span>
@@ -92,6 +114,20 @@ function FileRow({ arquivo, color, onDelete, readonly }: {
           </svg>
         </button>
       )}
+      <button
+        onClick={handleCheck}
+        disabled={savingCheck}
+        title={checked ? 'Desmarcar' : 'Marcar'}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center', opacity: savingCheck ? 0.5 : 1, flexShrink: 0 }}
+      >
+        <div style={{ width: 15, height: 15, borderRadius: 4, border: `1.5px solid ${checked ? '#34d399' : '#3a3a5c'}`, background: checked ? '#34d399' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}>
+          {checked && (
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none">
+              <path d="M20 6L9 17l-5-5" stroke="#08080f" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+        </div>
+      </button>
     </div>
   )
 }

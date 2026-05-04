@@ -14,6 +14,27 @@ async function getUserId(): Promise<string | null> {
   }
 }
 
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const userId = await getUserId()
+  if (!userId) return Response.json({ error: 'Não autorizado' }, { status: 401 })
+
+  const { id } = await params
+  const { checked } = await request.json() as { checked: boolean }
+
+  const { data, error } = await supabase
+    .from('administrativo_arquivos')
+    .update({ checked })
+    .eq('id', id)
+    .select('id, checked')
+    .single()
+
+  if (error) return Response.json({ error: 'Erro ao atualizar.' }, { status: 500 })
+  return Response.json({ arquivo: data })
+}
+
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
