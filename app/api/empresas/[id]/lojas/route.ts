@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
-import { hasPermission, isAdmin } from '@/lib/permissions'
+import { hasPermission } from '@/lib/permissions'
 
 async function getUserId(): Promise<string | null> {
   try {
@@ -42,8 +42,7 @@ export async function POST(
 ) {
   const userId = await getUserId()
   if (!userId) return Response.json({ error: 'Não autorizado' }, { status: 401 })
-  // Só admin pode criar novas lojas
-  if (!(await isAdmin(userId))) return Response.json({ error: 'Acesso negado' }, { status: 403 })
+  if (!(await hasPermission(userId, 'cobranca'))) return Response.json({ error: 'Acesso negado' }, { status: 403 })
 
   const { id: empresaId } = await params
 

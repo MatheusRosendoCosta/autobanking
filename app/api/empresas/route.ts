@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
-import { hasPermission, isAdmin } from '@/lib/permissions'
+import { hasPermission } from '@/lib/permissions'
 
 async function getUserId(): Promise<string | null> {
   try {
@@ -33,8 +33,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const userId = await getUserId()
   if (!userId) return Response.json({ error: 'Não autorizado' }, { status: 401 })
-  // Só admin pode criar novas empresas
-  if (!(await isAdmin(userId))) return Response.json({ error: 'Acesso negado' }, { status: 403 })
+  if (!(await hasPermission(userId, 'cobranca'))) return Response.json({ error: 'Acesso negado' }, { status: 403 })
 
   const { nome } = (await request.json()) as { nome?: string }
   if (!nome?.trim()) return Response.json({ error: 'Nome é obrigatório' }, { status: 400 })
