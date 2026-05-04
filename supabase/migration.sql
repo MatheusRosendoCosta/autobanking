@@ -31,3 +31,28 @@ CREATE OR REPLACE TRIGGER users_updated_at
 
 -- Row Level Security (o backend usa service role key, então RLS não bloqueia)
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+
+-- ─── Administrativo ────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS public.administrativo_cards (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    UUID        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  data       DATE        NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS adm_cards_user_idx ON public.administrativo_cards (user_id);
+
+CREATE TABLE IF NOT EXISTS public.administrativo_arquivos (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  card_id     UUID        NOT NULL REFERENCES public.administrativo_cards(id) ON DELETE CASCADE,
+  tipo        TEXT        NOT NULL CHECK (tipo IN ('api', 'money_plus', 'floor_plan')),
+  nome        TEXT        NOT NULL,
+  bucket_path TEXT        NOT NULL,
+  tamanho     INTEGER     NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (card_id, tipo)
+);
+
+ALTER TABLE public.administrativo_cards ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.administrativo_arquivos ENABLE ROW LEVEL SECURITY;
