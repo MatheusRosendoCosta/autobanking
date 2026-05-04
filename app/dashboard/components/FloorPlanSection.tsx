@@ -93,29 +93,33 @@ function BoletoRow({ boleto, onDelete }: { boleto: Boleto; onDelete: (id: string
 
 function UploadBoleto({ cardId, onUploaded }: { cardId: string; onUploaded: (b: Boleto) => void }) {
   const fileRef = useRef<HTMLInputElement>(null)
+  const [open, setOpen] = useState(false)
   const [loja, setLoja] = useState('')
+  const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [error, setError] = useState('')
-  const [pendingFile, setPendingFile] = useState<File | null>(null)
 
-  const upload = async (file: File, lojaName: string) => {
+  const reset = () => { setOpen(false); setLoja(''); setFile(null); setError('') }
+
+  const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    e.preventDefault()
     setError('')
+    if (!loja.trim()) { setError('Informe o nome da loja.'); return }
+    if (!file) { setError('Selecione o boleto em PDF.'); return }
     if (file.type !== 'application/pdf') { setError('Somente PDF.'); return }
     if (file.size > 20 * 1024 * 1024) { setError('Máximo 20MB.'); return }
-    if (!lojaName.trim()) { setError('Informe a loja.'); return }
 
     setUploading(true)
     try {
       const fd = new FormData()
       fd.append('file', file)
-      fd.append('loja', lojaName.trim())
+      fd.append('loja', loja.trim())
       const res = await fetch(`/api/floorplan/juros/${cardId}/upload`, { method: 'POST', body: fd })
       const json = await res.json()
       if (!res.ok) { setError(json.error ?? 'Erro ao enviar.'); return }
       onUploaded(json.boleto)
-      setLoja('')
-      setPendingFile(null)
+      reset()
     } catch {
       setError('Erro de conexão.')
     } finally {
@@ -123,80 +127,111 @@ function UploadBoleto({ cardId, onUploaded }: { cardId: string; onUploaded: (b: 
     }
   }
 
-  const handleFilePick = (file: File) => {
-    setPendingFile(file)
-    setError('')
-    if (loja.trim()) upload(file, loja)
-  }
-
-  const handleSubmit = () => {
-    if (pendingFile) upload(pendingFile, loja)
-    else fileRef.current?.click()
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 8, border: '1px dashed rgba(124,58,237,0.3)', background: 'transparent', color: '#7c6fa0', fontSize: 12, cursor: 'pointer', width: '100%', justifyContent: 'center', transition: 'border-color 0.15s' }}
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+          <path d="M12 5v14M5 12h14" stroke="#a78bfa" strokeWidth="2.2" strokeLinecap="round" />
+        </svg>
+        Adicionar Loja
+      </button>
+    )
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-        {/* Campo loja */}
+    <form
+      onSubmit={handleSubmit}
+      style={{ background: 'rgba(124,58,237,0.05)', border: '1px solid rgba(124,58,237,0.2)', borderRadius: 10, padding: '12px 12px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}
+    >
+      <p style={{ fontSize: 12, fontWeight: 600, color: '#a78bfa', margin: 0 }}>Nova Loja</p>
+
+      {/* Campo loja */}
+      <div>
+        <label style={{ fontSize: 11, color: '#7c6fa0', display: 'block', marginBottom: 3 }}>Nome da Loja</label>
         <input
           type="text"
-          placeholder="Loja..."
+          placeholder="Ex: Loja Centro"
           value={loja}
           onChange={e => setLoja(e.target.value)}
-          style={{ flex: '1 1 120px', minWidth: 100, padding: '7px 10px', borderRadius: 7, border: '1px solid #1e1b4b', background: '#08080f', color: '#f8fafc', fontSize: 12, outline: 'none' }}
-          onKeyDown={e => { if (e.key === 'Enter') handleSubmit() }}
+          autoFocus
+          style={{ width: '100%', padding: '7px 10px', borderRadius: 7, border: '1px solid #1e1b4b', background: '#08080f', color: '#f8fafc', fontSize: 12, outline: 'none', boxSizing: 'border-box' }}
         />
+      </div>
 
-        {/* Drop zone */}
+      {/* Campo arquivo */}
+      <div>
+        <label style={{ fontSize: 11, color: '#7c6fa0', display: 'block', marginBottom: 3 }}>Boleto de Juros (PDF)</label>
         <div
           onDragOver={e => { e.preventDefault(); setDragging(true) }}
           onDragLeave={() => setDragging(false)}
-          onDrop={e => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) handleFilePick(f) }}
-          onClick={() => !uploading && fileRef.current?.click()}
+          onDrop={e => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) setFile(f) }}
+          onClick={() => fileRef.current?.click()}
           style={{
-            flex: '2 1 160px',
-            border: `1.5px dashed ${dragging ? '#a78bfa' : pendingFile ? 'rgba(124,58,237,0.4)' : 'rgba(124,58,237,0.2)'}`,
+            border: `1.5px dashed ${dragging ? '#a78bfa' : file ? 'rgba(124,58,237,0.5)' : 'rgba(124,58,237,0.2)'}`,
             borderRadius: 7,
-            padding: '7px 10px',
+            padding: '9px 12px',
             display: 'flex',
             alignItems: 'center',
-            gap: 6,
-            cursor: uploading ? 'not-allowed' : 'pointer',
-            background: dragging ? 'rgba(124,58,237,0.06)' : 'transparent',
-            opacity: uploading ? 0.6 : 1,
-            transition: 'border-color 0.15s',
+            gap: 7,
+            cursor: 'pointer',
+            background: dragging ? 'rgba(124,58,237,0.06)' : file ? 'rgba(124,58,237,0.05)' : 'transparent',
+            transition: 'all 0.15s',
           }}
         >
-          {uploading ? (
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }}>
-              <circle cx="12" cy="12" r="9" stroke="#a78bfa" strokeWidth="2.5" strokeDasharray="28" strokeDashoffset="8" />
-            </svg>
-          ) : (
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
-              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          )}
-          <span style={{ fontSize: 11, color: pendingFile ? '#a78bfa' : '#7c6fa0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {uploading ? 'Enviando...' : pendingFile ? pendingFile.name : 'Boleto de Juros (PDF)'}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke={file ? '#a78bfa' : '#4a4568'} strokeWidth="1.6" fill="none" />
+            <path d="M14 2v6h6" stroke={file ? '#a78bfa' : '#4a4568'} strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+          <span style={{ fontSize: 12, color: file ? '#f8fafc' : '#7c6fa0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+            {file ? file.name : 'Clique ou arraste o PDF aqui'}
           </span>
+          {file && (
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); setFile(null) }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#7c6fa0', padding: 2, display: 'flex', alignItems: 'center', flexShrink: 0 }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
+          )}
         </div>
-
-        {/* Botão enviar quando loja + arquivo prontos */}
-        {pendingFile && loja.trim() && !uploading && (
-          <button
-            onClick={handleSubmit}
-            style={{ padding: '7px 12px', borderRadius: 7, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#7c3aed,#4c1d95)', color: '#f8fafc', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}
-          >
-            Anexar
-          </button>
-        )}
       </div>
 
       {error && <p style={{ fontSize: 11, color: '#fca5a5', margin: 0 }}>{error}</p>}
 
+      {/* Botões */}
+      <div style={{ display: 'flex', gap: 6, paddingTop: 2 }}>
+        <button
+          type="submit"
+          disabled={uploading}
+          style={{ flex: 1, padding: '7px 0', borderRadius: 7, border: 'none', cursor: uploading ? 'not-allowed' : 'pointer', background: 'linear-gradient(135deg,#7c3aed,#4c1d95)', color: '#f8fafc', fontSize: 12, fontWeight: 600, opacity: uploading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+        >
+          {uploading ? (
+            <>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ animation: 'spin 1s linear infinite' }}>
+                <circle cx="12" cy="12" r="9" stroke="white" strokeWidth="2.5" strokeDasharray="28" strokeDashoffset="8" />
+              </svg>
+              Enviando...
+            </>
+          ) : 'Adicionar'}
+        </button>
+        <button
+          type="button"
+          onClick={reset}
+          style={{ padding: '7px 12px', borderRadius: 7, border: '1px solid #1e1b4b', cursor: 'pointer', background: 'transparent', color: '#7c6fa0', fontSize: 12 }}
+        >
+          Cancelar
+        </button>
+      </div>
+
       <input ref={fileRef} type="file" accept="application/pdf" style={{ display: 'none' }}
-        onChange={e => { const f = e.target.files?.[0]; if (f) handleFilePick(f); e.target.value = '' }} />
-    </div>
+        onChange={e => { const f = e.target.files?.[0]; if (f) setFile(f); e.target.value = '' }} />
+    </form>
   )
 }
 
@@ -260,12 +295,10 @@ function JurosCard({ card, onDelete, onBoletoChange }: {
       )}
 
       {/* Upload */}
-      <div style={{ borderTop: card.boletos.length > 0 ? '1px solid #1e1b4b' : 'none', paddingTop: card.boletos.length > 0 ? 10 : 0 }}>
-        <UploadBoleto
-          cardId={card.id}
-          onUploaded={b => onBoletoChange(card.id, b)}
-        />
-      </div>
+      <UploadBoleto
+        cardId={card.id}
+        onUploaded={b => onBoletoChange(card.id, b)}
+      />
     </div>
   )
 }
