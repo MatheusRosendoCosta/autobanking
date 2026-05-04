@@ -22,13 +22,17 @@ export async function PATCH(
   if (!userId) return Response.json({ error: 'Não autorizado' }, { status: 401 })
 
   const { id } = await params
-  const { checked } = await request.json() as { checked: boolean }
+  const body = await request.json() as { checked_cards?: boolean; checked_carne?: boolean }
+
+  const updates: Record<string, boolean> = {}
+  if (body.checked_cards !== undefined) updates.checked_cards = body.checked_cards
+  if (body.checked_carne !== undefined) updates.checked_carne = body.checked_carne
 
   const { data, error } = await supabase
     .from('administrativo_arquivos')
-    .update({ checked })
+    .update(updates)
     .eq('id', id)
-    .select('id, checked')
+    .select('id, checked_cards, checked_carne')
     .single()
 
   if (error) return Response.json({ error: 'Erro ao atualizar.' }, { status: 500 })

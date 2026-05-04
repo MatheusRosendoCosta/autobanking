@@ -13,7 +13,8 @@ interface Arquivo {
   tipo: Tipo
   nome: string
   tamanho: number
-  checked: boolean
+  checked_cards: boolean
+  checked_carne: boolean
   created_at: string
 }
 
@@ -45,15 +46,16 @@ function formatSize(bytes: number): string {
 
 // ─── FileRow ───────────────────────────────────────────────────────────────────
 
-function FileRow({ arquivo, color, onDelete, onCheckChange, readonly }: {
+function FileRow({ arquivo, color, context, onDelete, onCheckChange, readonly }: {
   arquivo: Arquivo
   color: string
+  context: 'cards' | 'carne'
   onDelete?: (id: string) => void
   onCheckChange?: (id: string, checked: boolean) => void
   readonly?: boolean
 }) {
   const [deleting, setDeleting] = useState(false)
-  const [checked, setChecked] = useState(arquivo.checked)
+  const [checked, setChecked] = useState(context === 'cards' ? arquivo.checked_cards : arquivo.checked_carne)
   const [savingCheck, setSavingCheck] = useState(false)
 
   const handleView = async () => {
@@ -77,11 +79,12 @@ function FileRow({ arquivo, color, onDelete, onCheckChange, readonly }: {
     const newVal = !checked
     setChecked(newVal)
     setSavingCheck(true)
+    const field = context === 'cards' ? 'checked_cards' : 'checked_carne'
     try {
       await fetch(`/api/administrativo/arquivos/${arquivo.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ checked: newVal }),
+        body: JSON.stringify({ [field]: newVal }),
       })
       onCheckChange?.(arquivo.id, newVal)
     } catch {
@@ -134,10 +137,11 @@ function FileRow({ arquivo, color, onDelete, onCheckChange, readonly }: {
 
 // ─── TipoSection ───────────────────────────────────────────────────────────────
 
-function TipoSection({ cardId, tipo, arquivos, onUploaded, onDeleted, readonly }: {
+function TipoSection({ cardId, tipo, arquivos, context, onUploaded, onDeleted, readonly }: {
   cardId: string
   tipo: (typeof TIPOS)[number]
   arquivos: Arquivo[]
+  context: 'cards' | 'carne'
   onUploaded?: (a: Arquivo) => void
   onDeleted?: (id: string) => void
   readonly?: boolean
@@ -182,7 +186,7 @@ function TipoSection({ cardId, tipo, arquivos, onUploaded, onDeleted, readonly }
       {arquivos.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {arquivos.map(a => (
-            <FileRow key={a.id} arquivo={a} color={tipo.color} onDelete={onDeleted} readonly={readonly} />
+            <FileRow key={a.id} arquivo={a} color={tipo.color} context={context} onDelete={onDeleted} readonly={readonly} />
           ))}
         </div>
       )}
@@ -233,8 +237,9 @@ function TipoSection({ cardId, tipo, arquivos, onUploaded, onDeleted, readonly }
 
 // ─── CardItem ──────────────────────────────────────────────────────────────────
 
-function CardItem({ card, onDelete, onArquivoChange, onToggleCarne, readonly }: {
+function CardItem({ card, context, onDelete, onArquivoChange, onToggleCarne, readonly }: {
   card: Card
+  context: 'cards' | 'carne'
   onDelete?: (id: string) => void
   onArquivoChange?: (cardId: string, arquivo: Arquivo | null, deletedId?: string) => void
   onToggleCarne?: (card: Card) => void
@@ -350,6 +355,7 @@ function CardItem({ card, onDelete, onArquivoChange, onToggleCarne, readonly }: 
             cardId={card.id}
             tipo={tipo}
             arquivos={card.arquivos.filter(a => a.tipo === tipo.id)}
+            context={context}
             onUploaded={onArquivoChange ? a => onArquivoChange(card.id, a) : undefined}
             onDeleted={onArquivoChange ? id => onArquivoChange(card.id, null, id) : undefined}
             readonly={readonly}
@@ -390,6 +396,7 @@ function CarneView({ cards, onToggleCarne }: {
           <CardItem
             key={card.id}
             card={card}
+            context="carne"
             onToggleCarne={onToggleCarne}
             readonly
           />
@@ -564,6 +571,7 @@ export default function AdministrativoSection() {
             <CardItem
               key={card.id}
               card={card}
+              context="cards"
               onDelete={handleDelete}
               onArquivoChange={handleArquivoChange}
               onToggleCarne={handleToggleCarne}
