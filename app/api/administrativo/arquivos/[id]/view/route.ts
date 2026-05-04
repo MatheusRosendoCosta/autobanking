@@ -31,7 +31,7 @@ export async function GET(
 
   if (!arquivo) return Response.json({ error: 'Arquivo não encontrado.' }, { status: 404 })
 
-  const card = arquivo.administrativo_cards as { user_id: string } | null
+  const card = (arquivo.administrativo_cards as unknown as { user_id: string } | null)
   if (!card || card.user_id !== userId) {
     return Response.json({ error: 'Não autorizado.' }, { status: 403 })
   }
