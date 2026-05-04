@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 
 const SECTIONS = [
   { id: 'cobranca',       label: 'Cobrança',       color: '#a78bfa' },
+  { id: 'floorplan',      label: 'Floor Plan',      color: '#60a5fa' },
   { id: 'administrativo', label: 'Administrativo',  color: '#34d399' },
 ] as const
 
