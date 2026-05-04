@@ -15,7 +15,7 @@ async function getUserId(): Promise<string | null> {
   }
 }
 
-const VALID_SECTIONS = ['cobranca', 'floorplan', 'administrativo']
+const VALID_SECTIONS = ['cobranca', 'administrativo']
 
 // Replace all permissions for a user
 export async function PUT(

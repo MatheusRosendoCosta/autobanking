@@ -33,13 +33,13 @@ export async function POST(request: NextRequest) {
   if (!Array.isArray(rows) || rows.length === 0)
     return Response.json({ error: 'Nenhuma linha para importar' }, { status: 400 })
 
-  // Busca cobranças existentes para deduplicação (cliente normalizado + loja_id)
+  // Busca cobranças existentes para deduplicação por nome do cliente
   const { data: existentes } = await supabase
     .from('cobrancas')
-    .select('cliente, loja_id')
+    .select('cliente')
 
   const existentesSet = new Set<string>(
-    (existentes ?? []).map(c => `${c.cliente.trim().toLowerCase()}:${c.loja_id}`)
+    (existentes ?? []).map(c => c.cliente.trim().toLowerCase())
   )
 
   let imported = 0

@@ -3,11 +3,10 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import CobrancaSection from './components/CobrancaSection'
-import FloorPlanSection from './components/FloorPlanSection'
 import AdministrativoSection from './components/AdministrativoSection'
 import AdminUsersModal from './components/AdminUsersModal'
 
-type Section = 'cobranca' | 'floorplan' | 'administrativo'
+type Section = 'cobranca' | 'administrativo'
 
 interface CurrentUser {
   id: string
@@ -19,7 +18,6 @@ interface CurrentUser {
 
 const ALL_NAV_ITEMS: { id: Section; label: string }[] = [
   { id: 'cobranca', label: 'Cobrança' },
-  { id: 'floorplan', label: 'Floor Plan' },
   { id: 'administrativo', label: 'Administrativo' },
 ]
 
@@ -371,9 +369,6 @@ export default function DashboardPage() {
           <>
             <div style={{ display: active === 'cobranca' ? 'block' : 'none' }}>
               <CobrancaSection />
-            </div>
-            <div style={{ display: active === 'floorplan' ? 'block' : 'none' }}>
-              <FloorPlanSection />
             </div>
             <div style={{ display: active === 'administrativo' ? 'block' : 'none' }}>
               <AdministrativoSection />
