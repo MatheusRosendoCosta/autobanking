@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { resolveDataUserId } from '@/lib/permissions'
 
 async function getUserId(): Promise<string | null> {
   try {
@@ -18,10 +19,13 @@ export async function GET() {
   const userId = await getUserId()
   if (!userId) return Response.json({ error: 'Não autorizado' }, { status: 401 })
 
+  const dataUserId = await resolveDataUserId(userId, 'cobranca')
+  if (!dataUserId) return Response.json({ error: 'Acesso negado' }, { status: 403 })
+
   const { data, error } = await supabase
     .from('cobrancas')
     .select('*, empresa:empresa_id(id, nome), loja:loja_id(id, nome)')
-    .eq('user_id', userId)
+    .eq('user_id', dataUserId)
     .order('created_at', { ascending: false })
 
   if (error) return Response.json({ error: 'Erro ao buscar cobranças' }, { status: 500 })

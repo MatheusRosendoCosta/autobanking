@@ -1,13 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import CobrancaSection from './components/CobrancaSection'
 import FloorPlanSection from './components/FloorPlanSection'
+import AdministrativoSection from './components/AdministrativoSection'
+import AdminUsersModal from './components/AdminUsersModal'
 
 type Section = 'cobranca' | 'floorplan' | 'administrativo'
 
-const NAV_ITEMS: { id: Section; label: string }[] = [
+interface CurrentUser {
+  id: string
+  name: string
+  email: string
+  role: 'admin' | 'user'
+  permissions: string[]
+}
+
+const ALL_NAV_ITEMS: { id: Section; label: string }[] = [
   { id: 'cobranca', label: 'Cobrança' },
   { id: 'floorplan', label: 'Floor Plan' },
   { id: 'administrativo', label: 'Administrativo' },
@@ -156,7 +166,30 @@ export default function DashboardPage() {
   const router = useRouter()
   const [active, setActive] = useState<Section>('cobranca')
   const [showChangePassword, setShowChangePassword] = useState(false)
+  const [showAdminModal, setShowAdminModal] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(r => r.json())
+      .then(d => {
+        if (d.user) {
+          setCurrentUser(d.user)
+          // Set first allowed section as active
+          if (d.user.role !== 'admin' && d.user.permissions.length > 0) {
+            setActive(d.user.permissions[0] as Section)
+          }
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  const isAdmin = currentUser?.role === 'admin'
+
+  const navItems = ALL_NAV_ITEMS.filter(item =>
+    isAdmin || (currentUser?.permissions ?? []).includes(item.id)
+  )
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
@@ -168,6 +201,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen" style={{ background: '#08080f' }}>
       {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
+      {showAdminModal && <AdminUsersModal onClose={() => setShowAdminModal(false)} />}
 
       {/* Header */}
       <header
@@ -193,7 +227,7 @@ export default function DashboardPage() {
 
         {/* Nav — desktop only */}
         <nav className="hidden md:flex items-center gap-1">
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <button
               key={item.id}
               onClick={() => setActive(item.id)}
@@ -211,6 +245,24 @@ export default function DashboardPage() {
 
         {/* Actions — desktop only */}
         <div className="hidden md:flex items-center gap-2">
+          {/* Botão admin — só para admin */}
+          {isAdmin && (
+            <button
+              onClick={() => setShowAdminModal(true)}
+              className="px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer flex items-center gap-1.5"
+              style={{ color: '#34d399', border: '1px solid rgba(52,211,153,0.25)', background: 'transparent' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(52,211,153,0.08)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.8" fill="none" />
+                <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+              Usuários
+            </button>
+          )}
+
           <button
             onClick={() => setShowChangePassword(true)}
             className="px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer"
@@ -257,21 +309,10 @@ export default function DashboardPage() {
       {/* Mobile menu drawer */}
       {menuOpen && (
         <div className="md:hidden fixed inset-0 z-40" style={{ top: 64 }}>
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0"
-            style={{ background: 'rgba(0,0,0,0.5)' }}
-            onClick={closeMenu}
-          />
-
-          {/* Drawer */}
-          <div
-            className="relative z-10"
-            style={{ background: '#0d0d1f', borderBottom: '1px solid #1e1b4b' }}
-          >
-            {/* Nav items */}
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={closeMenu} />
+          <div className="relative z-10" style={{ background: '#0d0d1f', borderBottom: '1px solid #1e1b4b' }}>
             <nav className="p-3 space-y-1">
-              {NAV_ITEMS.map((item) => (
+              {navItems.map((item) => (
                 <button
                   key={item.id}
                   onClick={() => { setActive(item.id); closeMenu() }}
@@ -286,9 +327,16 @@ export default function DashboardPage() {
                 </button>
               ))}
             </nav>
-
-            {/* Action buttons */}
             <div className="px-3 pb-3 space-y-2" style={{ borderTop: '1px solid #1e1b4b', paddingTop: 12 }}>
+              {isAdmin && (
+                <button
+                  onClick={() => { setShowAdminModal(true); closeMenu() }}
+                  className="w-full px-4 py-3 rounded-xl text-sm font-medium text-left cursor-pointer"
+                  style={{ color: '#34d399', border: '1px solid rgba(52,211,153,0.25)', background: 'transparent' }}
+                >
+                  Usuários
+                </button>
+              )}
               <button
                 onClick={() => { setShowChangePassword(true); closeMenu() }}
                 className="w-full px-4 py-3 rounded-xl text-sm font-medium text-left cursor-pointer"
@@ -310,16 +358,28 @@ export default function DashboardPage() {
 
       {/* Content */}
       <main className="p-4 md:p-8">
-        <div style={{ display: active === 'cobranca' ? 'block' : 'none' }}>
-          <CobrancaSection />
-        </div>
-        <div style={{ display: active === 'floorplan' ? 'block' : 'none' }}>
-          <FloorPlanSection />
-        </div>
-        <div style={{ display: active === 'administrativo' ? 'block' : 'none' }}>
-          <h1 className="text-xl font-bold mb-1" style={{ color: '#f8fafc' }}>Administrativo</h1>
-          <p className="text-sm" style={{ color: '#7c6fa0' }}>Módulo em construção...</p>
-        </div>
+        {navItems.length === 0 && currentUser !== null ? (
+          <div style={{ textAlign: 'center', padding: '80px 24px' }}>
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" style={{ margin: '0 auto 14px', display: 'block', opacity: 0.3 }}>
+              <rect x="3" y="11" width="18" height="11" rx="2" stroke="#7c6fa0" strokeWidth="1.5" fill="none" />
+              <path d="M7 11V7a5 5 0 0110 0v4" stroke="#7c6fa0" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            <p style={{ color: '#7c6fa0', fontSize: 15, margin: 0 }}>Aguardando liberação de acesso.</p>
+            <p style={{ color: '#4a4568', fontSize: 13, marginTop: 6 }}>O administrador irá liberar as seções disponíveis para você.</p>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: active === 'cobranca' ? 'block' : 'none' }}>
+              <CobrancaSection />
+            </div>
+            <div style={{ display: active === 'floorplan' ? 'block' : 'none' }}>
+              <FloorPlanSection />
+            </div>
+            <div style={{ display: active === 'administrativo' ? 'block' : 'none' }}>
+              <AdministrativoSection />
+            </div>
+          </>
+        )}
       </main>
     </div>
   )
