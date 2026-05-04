@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { hasPermission } from '@/lib/permissions'
 
 interface ImportRow {
   cliente: string
@@ -25,13 +26,24 @@ async function getUserId(): Promise<string | null> {
 export async function POST(request: NextRequest) {
   const userId = await getUserId()
   if (!userId) return Response.json({ error: 'Não autorizado' }, { status: 401 })
+  if (!(await hasPermission(userId, 'cobranca'))) return Response.json({ error: 'Acesso negado' }, { status: 403 })
 
   const { rows } = (await request.json()) as { rows: ImportRow[] }
 
   if (!Array.isArray(rows) || rows.length === 0)
     return Response.json({ error: 'Nenhuma linha para importar' }, { status: 400 })
 
+  // Busca cobranças existentes para deduplicação (cliente normalizado + loja_id)
+  const { data: existentes } = await supabase
+    .from('cobrancas')
+    .select('cliente, loja_id')
+
+  const existentesSet = new Set<string>(
+    (existentes ?? []).map(c => `${c.cliente.trim().toLowerCase()}:${c.loja_id}`)
+  )
+
   let imported = 0
+  let skipped = 0
   const errors: string[] = []
 
   const empresaCache = new Map<string, string>()
@@ -50,7 +62,6 @@ export async function POST(request: NextRequest) {
         const { data: existing } = await supabase
           .from('empresas')
           .select('id')
-          .eq('user_id', userId)
           .ilike('nome', empresaNome)
           .maybeSingle()
 
@@ -95,6 +106,13 @@ export async function POST(request: NextRequest) {
         lojaCache.set(lojaKey, lojaId)
       }
 
+      // Verifica duplicata: mesmo cliente na mesma loja
+      const dupeKey = `${row.cliente.trim().toLowerCase()}:${lojaId}`
+      if (existentesSet.has(dupeKey)) {
+        skipped++
+        continue
+      }
+
       const { error: insertError } = await supabase.from('cobrancas').insert({
         user_id: userId,
         cliente: row.cliente.trim(),
@@ -105,11 +123,13 @@ export async function POST(request: NextRequest) {
       })
       if (insertError) throw new Error(insertError.message)
 
+      // Adiciona ao set para evitar duplicatas dentro da mesma planilha
+      existentesSet.add(dupeKey)
       imported++
     } catch (err) {
       errors.push(`Linha ${lineNum}: ${err instanceof Error ? err.message : 'erro desconhecido'}`)
     }
   }
 
-  return Response.json({ imported, errors })
+  return Response.json({ imported, skipped, errors })
 }

@@ -13,6 +13,7 @@ interface ImportRow {
 
 interface ImportResult {
   imported: number
+  skipped: number
   errors: string[]
 }
 
@@ -307,8 +308,13 @@ export default function ImportModal({ onClose, onImported }: ImportModalProps) {
                 <p className="font-semibold text-sm" style={{ color: '#f8fafc' }}>
                   {result.imported > 0
                     ? `${result.imported} cobrança${result.imported !== 1 ? 's' : ''} importada${result.imported !== 1 ? 's' : ''} com sucesso`
-                    : 'Nenhuma cobrança foi importada'}
+                    : 'Nenhuma cobrança nova foi importada'}
                 </p>
+                {result.skipped > 0 && (
+                  <p className="text-xs mt-1" style={{ color: '#7c6fa0' }}>
+                    {result.skipped} já existente{result.skipped !== 1 ? 's' : ''} ignorada{result.skipped !== 1 ? 's' : ''}
+                  </p>
+                )}
                 {result.errors.length > 0 && (
                   <p className="text-xs mt-1" style={{ color: '#7c6fa0' }}>
                     {result.errors.length} erro{result.errors.length !== 1 ? 's' : ''} encontrado{result.errors.length !== 1 ? 's' : ''}
