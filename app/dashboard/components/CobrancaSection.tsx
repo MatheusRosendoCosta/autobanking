@@ -403,7 +403,7 @@ function buildWhatsappMessage(items: Cobranca[]): string {
   for (const loja of lojas) {
     msg += `\n*${loja.nome}*\n\n`
     for (const c of loja.items) {
-      msg += `👤Cliente - ${c.cliente}\nVendedor - ${c.vendedor}\n\n`
+      msg += `👤Cliente - ${c.cliente}\nVendedor - ${c.vendedor}${c.observacao ? `\nObservação - ${c.observacao}` : ''}\n\n`
     }
   }
 
