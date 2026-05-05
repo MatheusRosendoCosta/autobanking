@@ -78,6 +78,7 @@ function FileRow({ arquivo, color, context, onDelete, onCheckChange, readonly }:
   const handleCheck = async () => {
     const newVal = !checked
     setChecked(newVal)
+    onCheckChange?.(arquivo.id, newVal)
     setSavingCheck(true)
     const field = context === 'cards' ? 'checked_cards' : 'checked_carne'
     try {
@@ -86,9 +87,9 @@ function FileRow({ arquivo, color, context, onDelete, onCheckChange, readonly }:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ [field]: newVal }),
       })
-      onCheckChange?.(arquivo.id, newVal)
     } catch {
       setChecked(!newVal)
+      onCheckChange?.(arquivo.id, !newVal)
     } finally {
       setSavingCheck(false)
     }
