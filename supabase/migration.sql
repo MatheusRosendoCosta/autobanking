@@ -84,3 +84,6 @@ CREATE INDEX IF NOT EXISTS qs_arquivos_card_idx ON public.quitacao_arquivos (car
 
 ALTER TABLE public.quitacao_cards   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quitacao_arquivos ENABLE ROW LEVEL SECURITY;
+
+-- Adicionar coluna status (rodar separado se a tabela já existir)
+ALTER TABLE public.quitacao_cards ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT '';

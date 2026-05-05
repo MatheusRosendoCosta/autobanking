@@ -972,8 +972,28 @@ interface QSCard {
   tipo: QSType
   nome: string
   observacao: string
+  status: string
   created_at: string
   arquivos: QSArquivo[]
+}
+
+const QS_STATUS: Record<QSType, { id: string; label: string; color: string; bg: string; border: string }[]> = {
+  quitacao: [
+    { id: 'aguardando_pagamento',   label: 'Aguardando Pagamento',    color: '#fbbf24', bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.3)'  },
+    { id: 'aguardando_baixa_placa', label: 'Aguardando Baixa da Placa', color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',  border: 'rgba(96,165,250,0.3)'  },
+    { id: 'conciliacao_appsheet',   label: 'Conciliação AppSheet',    color: '#2dd4bf', bg: 'rgba(45,212,191,0.12)',  border: 'rgba(45,212,191,0.3)'  },
+    { id: 'finalizado',             label: 'Finalizado',              color: '#34d399', bg: 'rgba(52,211,153,0.12)',  border: 'rgba(52,211,153,0.3)'  },
+  ],
+  substituicao: [
+    { id: 'aguardando_assinatura',  label: 'Aguardando Assinatura',   color: '#fb923c', bg: 'rgba(251,146,60,0.12)',  border: 'rgba(251,146,60,0.3)'  },
+    { id: 'chamado_em_processo',    label: 'Chamado em Processo',     color: '#a78bfa', bg: 'rgba(124,58,237,0.12)',  border: 'rgba(124,58,237,0.3)'  },
+    { id: 'conciliacao_appsheet',   label: 'Conciliação AppSheet',    color: '#2dd4bf', bg: 'rgba(45,212,191,0.12)',  border: 'rgba(45,212,191,0.3)'  },
+    { id: 'finalizado',             label: 'Finalizado',              color: '#34d399', bg: 'rgba(52,211,153,0.12)',  border: 'rgba(52,211,153,0.3)'  },
+  ],
+}
+
+function getQSStatus(tipo: QSType, statusId: string) {
+  return QS_STATUS[tipo].find(s => s.id === statusId) ?? QS_STATUS[tipo][0]
 }
 
 const QS_CONFIG: Record<QSType, { label: string; color: string; bg: string; border: string; gradient: string }> = {
@@ -1000,7 +1020,7 @@ const QS_SECOES_SUBSTITUICAO: { id: QSSecao; label: string; color: string; bg: s
 
 function QSArquivoSection({ cardId, secao, arquivos, onUploaded, onDeleted }: {
   cardId: string
-  secao: (typeof QS_SECOES)[number]
+  secao: (typeof QS_SECOES_QUITACAO)[number]
   arquivos: QSArquivo[]
   onUploaded: (a: QSArquivo) => void
   onDeleted: (id: string) => void
@@ -1096,15 +1116,18 @@ function QSArquivoSection({ cardId, secao, arquivos, onUploaded, onDeleted }: {
 
 // ─── QSCardItem ────────────────────────────────────────────────────────────────
 
-function QSCardItem({ card, onDelete, onArquivoChange, onObsChange, onRename }: {
+function QSCardItem({ card, onDelete, onArquivoChange, onObsChange, onRename, onCardUpdate }: {
   card: QSCard
   onDelete: (id: string) => void
   onArquivoChange: (cardId: string, arquivo: QSArquivo | null, deletedId?: string) => void
   onObsChange: (cardId: string, obs: string) => void
   onRename: (cardId: string, nome: string) => void
+  onCardUpdate: (cardId: string, fields: Partial<QSCard>) => void
 }) {
   const [deleting, setDeleting] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
+  const [showStatusMenu, setShowStatusMenu] = useState(false)
+  const [savingStatus, setSavingStatus] = useState(false)
   const [observacao, setObservacao] = useState(card.observacao)
   const [savingObs, setSavingObs] = useState(false)
   const [editingNome, setEditingNome] = useState(false)
@@ -1157,15 +1180,30 @@ function QSCardItem({ card, onDelete, onArquivoChange, onObsChange, onRename }: 
     finally { setSavingNome(false); setEditingNome(false) }
   }
 
+  const handleStatusChange = async (newStatus: string) => {
+    setShowStatusMenu(false)
+    setSavingStatus(true)
+    try {
+      const res = await fetch(`/api/floorplan/quitacao/cards/${card.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      if (res.ok) onCardUpdate(card.id, { status: newStatus })
+    } finally { setSavingStatus(false) }
+  }
+
   const handleNomeKey = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') saveNome()
     if (e.key === 'Escape') { setEditingNome(false); setNomeInput(card.nome) }
   }
 
   const dateStr = new Date(card.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const statusAtual = getQSStatus(card.tipo, card.status)
+  const statusOpts = QS_STATUS[card.tipo]
 
   return (
-    <div style={{ background: '#0d0d1f', border: `1px solid ${cfg.border}`, borderRadius: 14, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div style={{ background: '#0d0d1f', border: `1px solid ${card.status === 'finalizado' ? 'rgba(52,211,153,0.25)' : cfg.border}`, borderRadius: 14, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
@@ -1229,11 +1267,33 @@ function QSCardItem({ card, onDelete, onArquivoChange, onObsChange, onRename }: 
 
       {!collapsed && (
         <>
-          {/* Badge */}
-          <div>
-            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: 6, padding: '3px 9px', textTransform: 'uppercase' }}>
-              {cfg.label}
-            </span>
+          {/* Status */}
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowStatusMenu(v => !v)}
+              disabled={savingStatus}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 7, border: `1px solid ${statusAtual.border}`, background: statusAtual.bg, color: statusAtual.color, fontSize: 11, fontWeight: 600, cursor: 'pointer', opacity: savingStatus ? 0.6 : 1 }}
+            >
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: statusAtual.color, flexShrink: 0 }} />
+              {statusAtual.label}
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" style={{ marginLeft: 2 }}>
+                <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            {showStatusMenu && (
+              <div style={{ position: 'absolute', top: '110%', left: 0, zIndex: 50, background: '#0d0d1f', border: '1px solid #1e1b4b', borderRadius: 10, padding: 6, minWidth: 210, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+                {statusOpts.map(s => (
+                  <button
+                    key={s.id}
+                    onClick={() => handleStatusChange(s.id)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '7px 10px', borderRadius: 7, border: 'none', background: card.status === s.id ? s.bg : 'transparent', color: card.status === s.id ? s.color : '#7c6fa0', fontSize: 12, fontWeight: card.status === s.id ? 600 : 400, cursor: 'pointer', textAlign: 'left' }}
+                  >
+                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Observação */}
@@ -1270,25 +1330,26 @@ function QSCardItem({ card, onDelete, onArquivoChange, onObsChange, onRename }: 
   )
 }
 
-// ─── QuitacaoSubstituicao ──────────────────────────────────────────────────────
+// ─── QSView (base reutilizável) ────────────────────────────────────────────────
 
-function QuitacaoSubstituicao() {
+function QSView({ tipo }: { tipo: QSType }) {
+  const cfg = QS_CONFIG[tipo]
   const [cards, setCards] = useState<QSCard[]>([])
   const [loading, setLoading] = useState(true)
-  const [creating, setCreating] = useState<QSType | null>(null)
+  const [showForm, setShowForm] = useState(false)
   const [nome, setNome] = useState('')
   const [saving, setSaving] = useState(false)
   const [createError, setCreateError] = useState('')
 
   useEffect(() => {
-    fetch('/api/floorplan/quitacao/cards')
+    fetch(`/api/floorplan/quitacao/cards?tipo=${tipo}`)
       .then(r => r.json())
-      .then(d => { if (d.cards) setCards(d.cards) })
+      .then(d => { if (d.cards) setCards((d.cards as QSCard[]).filter(c => c.tipo === tipo)) })
       .finally(() => setLoading(false))
-  }, [])
+  }, [tipo])
 
-  const openForm = (tipo: QSType) => { setCreating(tipo); setNome(''); setCreateError('') }
-  const closeForm = () => { setCreating(null); setNome(''); setCreateError('') }
+  const openForm = () => { setShowForm(true); setNome(''); setCreateError('') }
+  const closeForm = () => { setShowForm(false); setNome(''); setCreateError('') }
 
   const handleCreate = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -1298,7 +1359,7 @@ function QuitacaoSubstituicao() {
       const res = await fetch('/api/floorplan/quitacao/cards', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tipo: creating, nome }),
+        body: JSON.stringify({ tipo, nome }),
       })
       const json = await res.json()
       if (!res.ok) { setCreateError(json.error ?? 'Erro ao criar.'); return }
@@ -1326,40 +1387,34 @@ function QuitacaoSubstituicao() {
     setCards(prev => prev.map(c => c.id === cardId ? { ...c, observacao: obs } : c))
   }
 
-  const handleRename = (cardId: string, nome: string) => {
-    setCards(prev => prev.map(c => c.id === cardId ? { ...c, nome } : c))
+  const handleRename = (cardId: string, novoNome: string) => {
+    setCards(prev => prev.map(c => c.id === cardId ? { ...c, nome: novoNome } : c))
   }
 
-  const cfg = creating ? QS_CONFIG[creating] : null
+  const handleCardUpdate = (cardId: string, fields: Partial<QSCard>) => {
+    setCards(prev => prev.map(c => c.id === cardId ? { ...c, ...fields } : c))
+  }
+
 
   return (
     <div>
       {/* Cabeçalho */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: '#f8fafc', margin: 0 }}>Quitação e Substituição</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: '#f8fafc', margin: 0 }}>{cfg.label}</h2>
           <p style={{ fontSize: 13, color: '#7c6fa0', margin: '2px 0 0' }}>{cards.length} registro{cards.length !== 1 ? 's' : ''}</p>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button
-            onClick={() => openForm('quitacao')}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: 'none', cursor: 'pointer', background: QS_CONFIG.quitacao.gradient, color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="white" strokeWidth="2.2" strokeLinecap="round" /></svg>
-            Nova Quitação
-          </button>
-          <button
-            onClick={() => openForm('substituicao')}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: 'none', cursor: 'pointer', background: QS_CONFIG.substituicao.gradient, color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="white" strokeWidth="2.2" strokeLinecap="round" /></svg>
-            Nova Substituição
-          </button>
-        </div>
+        <button
+          onClick={openForm}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: 'none', cursor: 'pointer', background: cfg.gradient, color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="white" strokeWidth="2.2" strokeLinecap="round" /></svg>
+          + Nova {cfg.label}
+        </button>
       </div>
 
-      {/* Formulário de criação */}
-      {creating && cfg && (
+      {/* Formulário */}
+      {showForm && (
         <form
           onSubmit={handleCreate}
           style={{ background: '#0d0d1f', border: `1px solid ${cfg.border}`, borderRadius: 12, padding: 14, marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 420 }}
@@ -1370,56 +1425,68 @@ function QuitacaoSubstituicao() {
               <label style={{ fontSize: 11, color: '#7c6fa0', display: 'block', marginBottom: 4 }}>Nome</label>
               <input
                 type="text"
-                placeholder={creating === 'quitacao' ? 'Ex: Honda Civic - João Silva' : 'Ex: Toyota Corolla → Honda HRV'}
+                placeholder={tipo === 'quitacao' ? 'Ex: Honda Civic - João Silva' : 'Ex: Toyota Corolla → Honda HRV'}
                 value={nome}
                 onChange={e => setNome(e.target.value)}
                 autoFocus
                 style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${cfg.border}`, background: '#08080f', color: '#f8fafc', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
               />
             </div>
-            <button
-              type="submit"
-              disabled={saving}
-              style={{ padding: '8px 16px', borderRadius: 8, border: 'none', cursor: saving ? 'not-allowed' : 'pointer', background: cfg.gradient, color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', opacity: saving ? 0.7 : 1 }}
-            >
+            <button type="submit" disabled={saving} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', cursor: saving ? 'not-allowed' : 'pointer', background: cfg.gradient, color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Criando...' : 'Criar'}
             </button>
-            <button
-              type="button"
-              onClick={closeForm}
-              style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #1e1b4b', cursor: 'pointer', background: 'transparent', color: '#7c6fa0', fontSize: 13 }}
-            >
-              ✕
-            </button>
+            <button type="button" onClick={closeForm} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #1e1b4b', cursor: 'pointer', background: 'transparent', color: '#7c6fa0', fontSize: 13 }}>✕</button>
           </div>
           {createError && <p style={{ fontSize: 11, color: '#fca5a5', margin: 0 }}>{createError}</p>}
         </form>
       )}
 
-      {/* Grid */}
+      {/* Kanban */}
       {loading ? (
         <p style={{ color: '#7c6fa0', fontSize: 14, textAlign: 'center', padding: 48 }}>Carregando...</p>
-      ) : cards.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px 24px', background: '#0d0d1f', border: '1px dashed #1e1b4b', borderRadius: 14 }}>
-          <svg width="38" height="38" viewBox="0 0 24 24" fill="none" style={{ margin: '0 auto 10px', display: 'block', opacity: 0.3 }}>
-            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="#7c6fa0" strokeWidth="1.5" fill="none" />
-            <path d="M14 2v6h6M16 13H8M16 17H8" stroke="#7c6fa0" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          <p style={{ color: '#7c6fa0', fontSize: 14, margin: 0 }}>Nenhum registro ainda.</p>
-          <p style={{ color: '#4a4568', fontSize: 13, marginTop: 4 }}>Clique em "Nova Quitação" ou "Nova Substituição" para começar.</p>
-        </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12, alignItems: 'start' }}>
-          {cards.map(card => (
-            <QSCardItem
-              key={card.id}
-              card={card}
-              onDelete={handleDelete}
-              onArquivoChange={handleArquivoChange}
-              onObsChange={handleObsChange}
-              onRename={handleRename}
-            />
-          ))}
+        <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 16, alignItems: 'flex-start' }}>
+          {QS_STATUS[tipo].map(status => {
+            const colCards = cards.filter(c => c.status === status.id)
+            return (
+              <div key={status.id} style={{ flexShrink: 0, width: 300, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {/* Cabeçalho da coluna */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 10, background: status.bg, border: `1px solid ${status.border}` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: status.color }} />
+                    <span style={{ fontSize: 12, fontWeight: 700, color: status.color, letterSpacing: '0.03em' }}>{status.label}</span>
+                  </div>
+                  {colCards.length > 0 && (
+                    <span style={{ fontSize: 11, fontWeight: 700, color: status.color, background: 'rgba(0,0,0,0.2)', borderRadius: 99, padding: '1px 7px' }}>
+                      {colCards.length}
+                    </span>
+                  )}
+                </div>
+
+                {/* Cards da coluna */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {colCards.map(card => (
+                    <QSCardItem
+                      key={card.id}
+                      card={card}
+                      onDelete={handleDelete}
+                      onArquivoChange={handleArquivoChange}
+                      onObsChange={handleObsChange}
+                      onRename={handleRename}
+                      onCardUpdate={handleCardUpdate}
+                    />
+                  ))}
+                </div>
+
+                {/* Coluna vazia */}
+                {colCards.length === 0 && (
+                  <div style={{ border: '1px dashed rgba(255,255,255,0.05)', borderRadius: 10, padding: '20px 12px', textAlign: 'center' }}>
+                    <p style={{ color: '#2a2a3f', fontSize: 12, margin: 0 }}>Sem registros</p>
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
@@ -1428,15 +1495,16 @@ function QuitacaoSubstituicao() {
 
 // ─── FloorPlanSection ──────────────────────────────────────────────────────────
 
-type SubPage = 'juros' | 'propostas' | 'quitacao'
+type SubPage = 'juros' | 'propostas' | 'quitacao' | 'substituicao'
 
 export default function FloorPlanSection() {
   const [subPage, setSubPage] = useState<SubPage>('juros')
 
   const SUB_ITEMS: { id: SubPage; label: string }[] = [
-    { id: 'juros',     label: 'Cobrança de Juros'        },
-    { id: 'propostas', label: 'Propostas Floor Plan'      },
-    { id: 'quitacao',  label: 'Quitação e Substituição'   },
+    { id: 'juros',        label: 'Cobrança de Juros'   },
+    { id: 'propostas',    label: 'Propostas Floor Plan' },
+    { id: 'quitacao',     label: 'Quitação'             },
+    { id: 'substituicao', label: 'Substituição'         },
   ]
 
   return (
@@ -1470,9 +1538,10 @@ export default function FloorPlanSection() {
       </div>
 
       {/* Conteúdo */}
-      {subPage === 'juros'     && <CobrancaJuros />}
-      {subPage === 'propostas' && <PropostasFloorPlan />}
-      {subPage === 'quitacao'  && <QuitacaoSubstituicao />}
+      {subPage === 'juros'        && <CobrancaJuros />}
+      {subPage === 'propostas'    && <PropostasFloorPlan />}
+      {subPage === 'quitacao'     && <QSView tipo="quitacao" />}
+      {subPage === 'substituicao' && <QSView tipo="substituicao" />}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
