@@ -1537,11 +1537,11 @@ export default function FloorPlanSection() {
         ))}
       </div>
 
-      {/* Conteúdo */}
-      {subPage === 'juros'        && <CobrancaJuros />}
-      {subPage === 'propostas'    && <PropostasFloorPlan />}
-      {subPage === 'quitacao'     && <QSView tipo="quitacao" />}
-      {subPage === 'substituicao' && <QSView tipo="substituicao" />}
+      {/* Conteúdo — display:none mantém o estado (collapsed, etc.) ao trocar de aba */}
+      <div style={{ display: subPage === 'juros'        ? 'block' : 'none' }}><CobrancaJuros /></div>
+      <div style={{ display: subPage === 'propostas'    ? 'block' : 'none' }}><PropostasFloorPlan /></div>
+      <div style={{ display: subPage === 'quitacao'     ? 'block' : 'none' }}><QSView tipo="quitacao" /></div>
+      <div style={{ display: subPage === 'substituicao' ? 'block' : 'none' }}><QSView tipo="substituicao" /></div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
