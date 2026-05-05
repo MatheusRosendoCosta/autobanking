@@ -1136,7 +1136,6 @@ function QSCardItem({ card, onDelete, onArquivoChange, onObsChange, onRename, on
   const [savingNome, setSavingNome] = useState(false)
   const obsTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const nomeRef = useRef<HTMLInputElement>(null)
-  const cfg = QS_CONFIG[card.tipo]
 
   const handleDelete = async () => {
     if (!confirm(`Deletar "${card.nome}"?`)) return
@@ -1204,11 +1203,11 @@ function QSCardItem({ card, onDelete, onArquivoChange, onObsChange, onRename, on
   const statusOpts = QS_STATUS[card.tipo]
 
   return (
-    <div style={{ background: '#0d0d1f', border: `1px solid ${card.status === 'finalizado' ? 'rgba(52,211,153,0.25)' : cfg.border}`, borderRadius: 14, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div style={{ background: '#0d0d1f', border: `1px solid ${card.status === 'finalizado' ? 'rgba(52,211,153,0.25)' : '#1e1b4b'}`, borderRadius: 14, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: cfg.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg,#7c3aed,#4c1d95)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             {card.tipo === 'quitacao' ? (
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
                 <path d="M20 6L9 17l-5-5" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
@@ -1407,9 +1406,11 @@ function QSView({ tipo }: { tipo: QSType }) {
         </div>
         <button
           onClick={openForm}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: 'none', cursor: 'pointer', background: cfg.gradient, color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#7c3aed,#4c1d95)', color: '#f8fafc', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}
         >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="white" strokeWidth="2.2" strokeLinecap="round" /></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path d="M12 5v14M5 12h14" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
+          </svg>
           + Nova {cfg.label}
         </button>
       </div>
@@ -1418,9 +1419,9 @@ function QSView({ tipo }: { tipo: QSType }) {
       {showForm && (
         <form
           onSubmit={handleCreate}
-          style={{ background: '#0d0d1f', border: `1px solid ${cfg.border}`, borderRadius: 12, padding: 14, marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 420 }}
+          style={{ background: '#0d0d1f', border: '1px solid #1e1b4b', borderRadius: 12, padding: 14, marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 420 }}
         >
-          <p style={{ fontSize: 13, fontWeight: 600, color: cfg.color, margin: 0 }}>Nova {cfg.label}</p>
+          <p style={{ fontSize: 13, fontWeight: 600, color: '#a78bfa', margin: 0 }}>Nova {cfg.label}</p>
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
             <div style={{ flex: 1 }}>
               <label style={{ fontSize: 11, color: '#7c6fa0', display: 'block', marginBottom: 4 }}>Nome</label>
@@ -1430,10 +1431,10 @@ function QSView({ tipo }: { tipo: QSType }) {
                 value={nome}
                 onChange={e => setNome(e.target.value)}
                 autoFocus
-                style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${cfg.border}`, background: '#08080f', color: '#f8fafc', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #1e1b4b', background: '#08080f', color: '#f8fafc', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
               />
             </div>
-            <button type="submit" disabled={saving} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', cursor: saving ? 'not-allowed' : 'pointer', background: cfg.gradient, color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', opacity: saving ? 0.7 : 1 }}>
+            <button type="submit" disabled={saving} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', cursor: saving ? 'not-allowed' : 'pointer', background: 'linear-gradient(135deg,#7c3aed,#4c1d95)', color: '#f8fafc', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Criando...' : 'Criar'}
             </button>
             <button type="button" onClick={closeForm} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #1e1b4b', cursor: 'pointer', background: 'transparent', color: '#7c6fa0', fontSize: 13 }}>✕</button>
