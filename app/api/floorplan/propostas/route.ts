@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
 
     const { data: card, error } = await supabase
       .from('propostas_cards')
-      .insert({ user_id: userId, nome: nome.trim() })
+      .insert({ user_id: userId, nome: nome.trim(), status: 'aguardando_documentos' })
       .select('*, arquivos:propostas_arquivos(*)')
       .single()
 
