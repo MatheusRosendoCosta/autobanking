@@ -979,6 +979,7 @@ interface QSCard {
 
 const QS_STATUS: Record<QSType, { id: string; label: string; color: string; bg: string; border: string }[]> = {
   quitacao: [
+    { id: 'aguardando_pix_boleto',  label: 'Aguardando PIX/Boleto',   color: '#e879f9', bg: 'rgba(232,121,249,0.12)', border: 'rgba(232,121,249,0.3)' },
     { id: 'aguardando_pagamento',   label: 'Aguardando Pagamento',    color: '#fbbf24', bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.3)'  },
     { id: 'aguardando_baixa_placa', label: 'Aguardando Baixa da Placa', color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',  border: 'rgba(96,165,250,0.3)'  },
     { id: 'conciliacao_appsheet',   label: 'Conciliação AppSheet',    color: '#2dd4bf', bg: 'rgba(45,212,191,0.12)',  border: 'rgba(45,212,191,0.3)'  },
