@@ -34,7 +34,7 @@ export async function PATCH(
   if (!(await hasPermission(userId, 'floorplan'))) return Response.json({ error: 'Acesso negado' }, { status: 403 })
 
   const { id } = await params
-  const body = await request.json() as { status?: string; observacao?: string }
+  const body = await request.json() as { status?: string; observacao?: string; nome?: string }
 
   const updates: Record<string, string> = {}
   if (body.status !== undefined) {
@@ -42,12 +42,16 @@ export async function PATCH(
     updates.status = body.status
   }
   if (body.observacao !== undefined) updates.observacao = body.observacao
+  if (body.nome !== undefined) {
+    if (!body.nome.trim()) return Response.json({ error: 'Nome não pode ser vazio.' }, { status: 400 })
+    updates.nome = body.nome.trim()
+  }
 
   const { data, error } = await supabase
     .from('propostas_cards')
     .update(updates)
     .eq('id', id)
-    .select('id, status, observacao')
+    .select('id, status, observacao, nome')
     .single()
 
   if (error) return Response.json({ error: 'Erro ao atualizar.' }, { status: 500 })
