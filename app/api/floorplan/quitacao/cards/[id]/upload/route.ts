@@ -15,7 +15,7 @@ async function getUserId(): Promise<string | null> {
   }
 }
 
-const SECOES_VALIDAS = ['boleto_pix', 'comprovante', 'ccb', 'comprovante_baixa']
+const SECOES_VALIDAS = ['boleto_pix', 'comprovante', 'ccb', 'comprovante_baixa', 'crlv', 'vistoria', 'aditamento', 'print_substituicao']
 
 export async function POST(
   request: NextRequest,

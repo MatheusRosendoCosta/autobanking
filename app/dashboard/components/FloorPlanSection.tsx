@@ -578,11 +578,16 @@ function PropostaCardItem({ card, onDelete, onArquivoChange, onCardUpdate }: {
   onCardUpdate: (cardId: string, fields: Partial<PropostaCard>) => void
 }) {
   const [deleting, setDeleting] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
   const [showStatusMenu, setShowStatusMenu] = useState(false)
   const [savingStatus, setSavingStatus] = useState(false)
   const [observacao, setObservacao] = useState(card.observacao)
   const [savingObs, setSavingObs] = useState(false)
+  const [editingNome, setEditingNome] = useState(false)
+  const [nomeInput, setNomeInput] = useState(card.nome)
+  const [savingNome, setSavingNome] = useState(false)
   const obsTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const nomeRef = useRef<HTMLInputElement>(null)
 
   const statusAtual = getStatus(card.status)
 
@@ -626,6 +631,29 @@ function PropostaCardItem({ card, onDelete, onArquivoChange, onCardUpdate }: {
     }, 800)
   }
 
+  const startEditNome = () => { setNomeInput(card.nome); setEditingNome(true); setTimeout(() => nomeRef.current?.select(), 0) }
+
+  const saveNome = async () => {
+    const trimmed = nomeInput.trim()
+    if (!trimmed || trimmed === card.nome) { setEditingNome(false); setNomeInput(card.nome); return }
+    setSavingNome(true)
+    try {
+      const res = await fetch(`/api/floorplan/propostas/${card.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nome: trimmed }),
+      })
+      if (res.ok) onCardUpdate(card.id, { nome: trimmed })
+      else setNomeInput(card.nome)
+    } catch { setNomeInput(card.nome) }
+    finally { setSavingNome(false); setEditingNome(false) }
+  }
+
+  const handleNomeKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') saveNome()
+    if (e.key === 'Escape') { setEditingNome(false); setNomeInput(card.nome) }
+  }
+
   return (
     <div style={{ background: '#0d0d1f', border: `1px solid ${card.status === 'finalizado' ? 'rgba(52,211,153,0.25)' : '#1e1b4b'}`, borderRadius: 14, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* Header */}
@@ -637,18 +665,50 @@ function PropostaCardItem({ card, onDelete, onArquivoChange, onCardUpdate }: {
               <path d="M14 2v6h6M16 13H8M16 17H8" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
             </svg>
           </div>
-          <div style={{ minWidth: 0 }}>
-            <p style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc', margin: 0, wordBreak: 'break-word' }}>{card.nome}</p>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            {editingNome ? (
+              <input
+                ref={nomeRef}
+                value={nomeInput}
+                onChange={e => setNomeInput(e.target.value)}
+                onBlur={saveNome}
+                onKeyDown={handleNomeKey}
+                disabled={savingNome}
+                style={{ width: '100%', fontSize: 14, fontWeight: 700, color: '#f8fafc', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '2px 6px', outline: 'none', boxSizing: 'border-box' }}
+              />
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }} onClick={startEditNome} title="Clique para renomear">
+                <p style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc', margin: 0, wordBreak: 'break-word' }}>{card.nome}</p>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, opacity: 0.4 }}>
+                  <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" />
+                  <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </div>
+            )}
             <p style={{ fontSize: 11, color: '#4a4568', margin: 0 }}>{card.arquivos.length} arquivo{card.arquivos.length !== 1 ? 's' : ''}</p>
           </div>
         </div>
-        <button onClick={handleDelete} disabled={deleting} style={{ background: 'transparent', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 7, cursor: 'pointer', color: '#fca5a5', display: 'flex', alignItems: 'center', padding: '4px 6px', opacity: deleting ? 0.4 : 1, flexShrink: 0 }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-            <polyline points="3 6 5 6 21 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-            <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-          </svg>
-        </button>
+        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+          <button
+            onClick={() => setCollapsed(v => !v)}
+            title={collapsed ? 'Expandir' : 'Minimizar'}
+            style={{ background: 'transparent', border: '1px solid #1e1b4b', borderRadius: 7, cursor: 'pointer', color: '#7c6fa0', display: 'flex', alignItems: 'center', padding: '4px 6px' }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ transition: 'transform 0.2s', transform: collapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+              <path d="M18 15l-6-6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <button onClick={handleDelete} disabled={deleting} style={{ background: 'transparent', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 7, cursor: 'pointer', color: '#fca5a5', display: 'flex', alignItems: 'center', padding: '4px 6px', opacity: deleting ? 0.4 : 1 }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+              <polyline points="3 6 5 6 21 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
       </div>
+
+      {!collapsed && (
+      <div style={{ display: 'contents' }}>
 
       {/* Status */}
       <div style={{ position: 'relative' }}>
@@ -710,6 +770,7 @@ function PropostaCardItem({ card, onDelete, onArquivoChange, onCardUpdate }: {
           />
         ))}
       </div>
+      </div>)}
     </div>
   )
 }
@@ -895,7 +956,7 @@ function PropostasFloorPlan() {
 // ─── QuitacaoSubstituicao ──────────────────────────────────────────────────────
 
 type QSType = 'quitacao' | 'substituicao'
-type QSSecao = 'boleto_pix' | 'comprovante' | 'ccb' | 'comprovante_baixa'
+type QSSecao = 'boleto_pix' | 'comprovante' | 'ccb' | 'comprovante_baixa' | 'crlv' | 'vistoria' | 'aditamento' | 'print_substituicao'
 
 interface QSArquivo {
   id: string
@@ -911,8 +972,28 @@ interface QSCard {
   tipo: QSType
   nome: string
   observacao: string
+  status: string
   created_at: string
   arquivos: QSArquivo[]
+}
+
+const QS_STATUS: Record<QSType, { id: string; label: string; color: string; bg: string; border: string }[]> = {
+  quitacao: [
+    { id: 'aguardando_pagamento',   label: 'Aguardando Pagamento',    color: '#fbbf24', bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.3)'  },
+    { id: 'aguardando_baixa_placa', label: 'Aguardando Baixa da Placa', color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',  border: 'rgba(96,165,250,0.3)'  },
+    { id: 'conciliacao_appsheet',   label: 'Conciliação AppSheet',    color: '#2dd4bf', bg: 'rgba(45,212,191,0.12)',  border: 'rgba(45,212,191,0.3)'  },
+    { id: 'finalizado',             label: 'Finalizado',              color: '#34d399', bg: 'rgba(52,211,153,0.12)',  border: 'rgba(52,211,153,0.3)'  },
+  ],
+  substituicao: [
+    { id: 'aguardando_assinatura',  label: 'Aguardando Assinatura',   color: '#fb923c', bg: 'rgba(251,146,60,0.12)',  border: 'rgba(251,146,60,0.3)'  },
+    { id: 'chamado_em_processo',    label: 'Chamado em Processo',     color: '#a78bfa', bg: 'rgba(124,58,237,0.12)',  border: 'rgba(124,58,237,0.3)'  },
+    { id: 'conciliacao_appsheet',   label: 'Conciliação AppSheet',    color: '#2dd4bf', bg: 'rgba(45,212,191,0.12)',  border: 'rgba(45,212,191,0.3)'  },
+    { id: 'finalizado',             label: 'Finalizado',              color: '#34d399', bg: 'rgba(52,211,153,0.12)',  border: 'rgba(52,211,153,0.3)'  },
+  ],
+}
+
+function getQSStatus(tipo: QSType, statusId: string) {
+  return QS_STATUS[tipo].find(s => s.id === statusId) ?? QS_STATUS[tipo][0]
 }
 
 const QS_CONFIG: Record<QSType, { label: string; color: string; bg: string; border: string; gradient: string }> = {
@@ -920,18 +1001,26 @@ const QS_CONFIG: Record<QSType, { label: string; color: string; bg: string; bord
   substituicao:{ label: 'Substituição',color: '#22d3ee', bg: 'rgba(34,211,238,0.10)',  border: 'rgba(34,211,238,0.28)',  gradient: 'linear-gradient(135deg,#0891b2,#164e63)' },
 }
 
-const QS_SECOES: { id: QSSecao; label: string; color: string; bg: string; border: string }[] = [
+const QS_SECOES_QUITACAO: { id: QSSecao; label: string; color: string; bg: string; border: string }[] = [
   { id: 'boleto_pix',        label: 'Boleto / PIX',            color: '#fbbf24', bg: 'rgba(251,191,36,0.08)',  border: 'rgba(251,191,36,0.20)' },
   { id: 'comprovante',       label: 'Comprovante de Pagamento', color: '#34d399', bg: 'rgba(52,211,153,0.08)',  border: 'rgba(52,211,153,0.20)' },
   { id: 'ccb',               label: 'CCB',                     color: '#a78bfa', bg: 'rgba(124,58,237,0.08)',  border: 'rgba(124,58,237,0.20)' },
   { id: 'comprovante_baixa', label: 'Comprovante Baixa',        color: '#60a5fa', bg: 'rgba(96,165,250,0.08)',  border: 'rgba(96,165,250,0.20)' },
 ]
 
+const QS_SECOES_SUBSTITUICAO: { id: QSSecao; label: string; color: string; bg: string; border: string }[] = [
+  { id: 'crlv',               label: 'CRLV',               color: '#34d399', bg: 'rgba(52,211,153,0.08)',  border: 'rgba(52,211,153,0.20)' },
+  { id: 'vistoria',           label: 'Vistoria',           color: '#fbbf24', bg: 'rgba(251,191,36,0.08)',  border: 'rgba(251,191,36,0.20)' },
+  { id: 'ccb',                label: 'CCB',                color: '#a78bfa', bg: 'rgba(124,58,237,0.08)',  border: 'rgba(124,58,237,0.20)' },
+  { id: 'aditamento',         label: 'Aditamento',         color: '#fb923c', bg: 'rgba(251,146,60,0.08)',  border: 'rgba(251,146,60,0.20)' },
+  { id: 'print_substituicao', label: 'Print Substituição', color: '#22d3ee', bg: 'rgba(34,211,238,0.08)',  border: 'rgba(34,211,238,0.20)' },
+]
+
 // ─── QSArquivoSection ──────────────────────────────────────────────────────────
 
 function QSArquivoSection({ cardId, secao, arquivos, onUploaded, onDeleted }: {
   cardId: string
-  secao: (typeof QS_SECOES)[number]
+  secao: (typeof QS_SECOES_QUITACAO)[number]
   arquivos: QSArquivo[]
   onUploaded: (a: QSArquivo) => void
   onDeleted: (id: string) => void
@@ -1027,16 +1116,25 @@ function QSArquivoSection({ cardId, secao, arquivos, onUploaded, onDeleted }: {
 
 // ─── QSCardItem ────────────────────────────────────────────────────────────────
 
-function QSCardItem({ card, onDelete, onArquivoChange, onObsChange }: {
+function QSCardItem({ card, onDelete, onArquivoChange, onObsChange, onRename, onCardUpdate }: {
   card: QSCard
   onDelete: (id: string) => void
   onArquivoChange: (cardId: string, arquivo: QSArquivo | null, deletedId?: string) => void
   onObsChange: (cardId: string, obs: string) => void
+  onRename: (cardId: string, nome: string) => void
+  onCardUpdate: (cardId: string, fields: Partial<QSCard>) => void
 }) {
   const [deleting, setDeleting] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
+  const [showStatusMenu, setShowStatusMenu] = useState(false)
+  const [savingStatus, setSavingStatus] = useState(false)
   const [observacao, setObservacao] = useState(card.observacao)
   const [savingObs, setSavingObs] = useState(false)
+  const [editingNome, setEditingNome] = useState(false)
+  const [nomeInput, setNomeInput] = useState(card.nome)
+  const [savingNome, setSavingNome] = useState(false)
   const obsTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const nomeRef = useRef<HTMLInputElement>(null)
   const cfg = QS_CONFIG[card.tipo]
 
   const handleDelete = async () => {
@@ -1064,13 +1162,51 @@ function QSCardItem({ card, onDelete, onArquivoChange, onObsChange }: {
     }, 800)
   }
 
+  const startEditNome = () => { setNomeInput(card.nome); setEditingNome(true); setTimeout(() => nomeRef.current?.select(), 0) }
+
+  const saveNome = async () => {
+    const trimmed = nomeInput.trim()
+    if (!trimmed || trimmed === card.nome) { setEditingNome(false); setNomeInput(card.nome); return }
+    setSavingNome(true)
+    try {
+      const res = await fetch(`/api/floorplan/quitacao/cards/${card.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nome: trimmed }),
+      })
+      if (res.ok) onRename(card.id, trimmed)
+      else setNomeInput(card.nome)
+    } catch { setNomeInput(card.nome) }
+    finally { setSavingNome(false); setEditingNome(false) }
+  }
+
+  const handleStatusChange = async (newStatus: string) => {
+    setShowStatusMenu(false)
+    setSavingStatus(true)
+    try {
+      const res = await fetch(`/api/floorplan/quitacao/cards/${card.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      if (res.ok) onCardUpdate(card.id, { status: newStatus })
+    } finally { setSavingStatus(false) }
+  }
+
+  const handleNomeKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') saveNome()
+    if (e.key === 'Escape') { setEditingNome(false); setNomeInput(card.nome) }
+  }
+
   const dateStr = new Date(card.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const statusAtual = getQSStatus(card.tipo, card.status)
+  const statusOpts = QS_STATUS[card.tipo]
 
   return (
-    <div style={{ background: '#0d0d1f', border: `1px solid ${cfg.border}`, borderRadius: 14, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div style={{ background: '#0d0d1f', border: `1px solid ${card.status === 'finalizado' ? 'rgba(52,211,153,0.25)' : cfg.border}`, borderRadius: 14, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
           <div style={{ width: 32, height: 32, borderRadius: 8, background: cfg.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             {card.tipo === 'quitacao' ? (
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
@@ -1082,84 +1218,138 @@ function QSCardItem({ card, onDelete, onArquivoChange, onObsChange }: {
               </svg>
             )}
           </div>
-          <div style={{ minWidth: 0 }}>
-            <p style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc', margin: 0, wordBreak: 'break-word', lineHeight: 1.2 }}>{card.nome}</p>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            {editingNome ? (
+              <input
+                ref={nomeRef}
+                value={nomeInput}
+                onChange={e => setNomeInput(e.target.value)}
+                onBlur={saveNome}
+                onKeyDown={handleNomeKey}
+                disabled={savingNome}
+                style={{ width: '100%', fontSize: 14, fontWeight: 700, color: '#f8fafc', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '2px 6px', outline: 'none', boxSizing: 'border-box' }}
+              />
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }} onClick={startEditNome} title="Clique para renomear">
+                <p style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc', margin: 0, wordBreak: 'break-word', lineHeight: 1.2 }}>{card.nome}</p>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, opacity: 0.4 }}>
+                  <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" />
+                  <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </div>
+            )}
             <p style={{ fontSize: 11, color: '#4a4568', margin: '2px 0 0' }}>{dateStr}</p>
           </div>
         </div>
-        <button
-          onClick={handleDelete}
-          disabled={deleting}
-          title="Deletar"
-          style={{ background: 'transparent', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 7, cursor: 'pointer', color: '#fca5a5', display: 'flex', alignItems: 'center', padding: '4px 6px', opacity: deleting ? 0.4 : 1, flexShrink: 0 }}
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-            <polyline points="3 6 5 6 21 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-            <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Badge */}
-      <div>
-        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: 6, padding: '3px 9px', textTransform: 'uppercase' }}>
-          {cfg.label}
-        </span>
-      </div>
-
-      {/* Observação */}
-      <div>
-        <label style={{ fontSize: 11, color: '#7c6fa0', display: 'block', marginBottom: 3 }}>
-          Observação
-          {savingObs && <span style={{ marginLeft: 6, color: '#4a4568' }}>salvando...</span>}
-        </label>
-        <textarea
-          value={observacao}
-          onChange={e => handleObsChange(e.target.value)}
-          rows={2}
-          placeholder="Adicione uma observação..."
-          style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #1e1b4b', background: '#08080f', color: '#f8fafc', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
-        />
-      </div>
-
-      {/* Seções de arquivo (somente quitação) */}
-      {card.tipo === 'quitacao' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {QS_SECOES.map(secao => (
-            <QSArquivoSection
-              key={secao.id}
-              cardId={card.id}
-              secao={secao}
-              arquivos={card.arquivos.filter(a => a.secao === secao.id)}
-              onUploaded={a => onArquivoChange(card.id, a)}
-              onDeleted={id => onArquivoChange(card.id, null, id)}
-            />
-          ))}
+        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+          <button
+            onClick={() => setCollapsed(v => !v)}
+            title={collapsed ? 'Expandir' : 'Minimizar'}
+            style={{ background: 'transparent', border: '1px solid #1e1b4b', borderRadius: 7, cursor: 'pointer', color: '#7c6fa0', display: 'flex', alignItems: 'center', padding: '4px 6px' }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ transition: 'transform 0.2s', transform: collapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+              <path d="M18 15l-6-6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            title="Deletar"
+            style={{ background: 'transparent', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 7, cursor: 'pointer', color: '#fca5a5', display: 'flex', alignItems: 'center', padding: '4px 6px', opacity: deleting ? 0.4 : 1 }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+              <polyline points="3 6 5 6 21 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </button>
         </div>
+      </div>
+
+      {!collapsed && (
+        <>
+          {/* Status */}
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowStatusMenu(v => !v)}
+              disabled={savingStatus}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 7, border: `1px solid ${statusAtual.border}`, background: statusAtual.bg, color: statusAtual.color, fontSize: 11, fontWeight: 600, cursor: 'pointer', opacity: savingStatus ? 0.6 : 1 }}
+            >
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: statusAtual.color, flexShrink: 0 }} />
+              {statusAtual.label}
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" style={{ marginLeft: 2 }}>
+                <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            {showStatusMenu && (
+              <div style={{ position: 'absolute', top: '110%', left: 0, zIndex: 50, background: '#0d0d1f', border: '1px solid #1e1b4b', borderRadius: 10, padding: 6, minWidth: 210, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+                {statusOpts.map(s => (
+                  <button
+                    key={s.id}
+                    onClick={() => handleStatusChange(s.id)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '7px 10px', borderRadius: 7, border: 'none', background: card.status === s.id ? s.bg : 'transparent', color: card.status === s.id ? s.color : '#7c6fa0', fontSize: 12, fontWeight: card.status === s.id ? 600 : 400, cursor: 'pointer', textAlign: 'left' }}
+                  >
+                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Observação */}
+          <div>
+            <label style={{ fontSize: 11, color: '#7c6fa0', display: 'block', marginBottom: 3 }}>
+              Observação
+              {savingObs && <span style={{ marginLeft: 6, color: '#4a4568' }}>salvando...</span>}
+            </label>
+            <textarea
+              value={observacao}
+              onChange={e => handleObsChange(e.target.value)}
+              rows={2}
+              placeholder="Adicione uma observação..."
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #1e1b4b', background: '#08080f', color: '#f8fafc', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
+            />
+          </div>
+
+          {/* Seções de arquivo */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {(card.tipo === 'quitacao' ? QS_SECOES_QUITACAO : QS_SECOES_SUBSTITUICAO).map(secao => (
+              <QSArquivoSection
+                key={secao.id}
+                cardId={card.id}
+                secao={secao}
+                arquivos={card.arquivos.filter(a => a.secao === secao.id)}
+                onUploaded={a => onArquivoChange(card.id, a)}
+                onDeleted={id => onArquivoChange(card.id, null, id)}
+              />
+            ))}
+          </div>
+        </>
       )}
     </div>
   )
 }
 
-// ─── QuitacaoSubstituicao ──────────────────────────────────────────────────────
+// ─── QSView (base reutilizável) ────────────────────────────────────────────────
 
-function QuitacaoSubstituicao() {
+function QSView({ tipo }: { tipo: QSType }) {
+  const cfg = QS_CONFIG[tipo]
   const [cards, setCards] = useState<QSCard[]>([])
   const [loading, setLoading] = useState(true)
-  const [creating, setCreating] = useState<QSType | null>(null)
+  const [showForm, setShowForm] = useState(false)
   const [nome, setNome] = useState('')
   const [saving, setSaving] = useState(false)
   const [createError, setCreateError] = useState('')
 
   useEffect(() => {
-    fetch('/api/floorplan/quitacao/cards')
+    fetch(`/api/floorplan/quitacao/cards?tipo=${tipo}`)
       .then(r => r.json())
-      .then(d => { if (d.cards) setCards(d.cards) })
+      .then(d => { if (d.cards) setCards((d.cards as QSCard[]).filter(c => c.tipo === tipo)) })
       .finally(() => setLoading(false))
-  }, [])
+  }, [tipo])
 
-  const openForm = (tipo: QSType) => { setCreating(tipo); setNome(''); setCreateError('') }
-  const closeForm = () => { setCreating(null); setNome(''); setCreateError('') }
+  const openForm = () => { setShowForm(true); setNome(''); setCreateError('') }
+  const closeForm = () => { setShowForm(false); setNome(''); setCreateError('') }
 
   const handleCreate = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -1169,7 +1359,7 @@ function QuitacaoSubstituicao() {
       const res = await fetch('/api/floorplan/quitacao/cards', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tipo: creating, nome }),
+        body: JSON.stringify({ tipo, nome }),
       })
       const json = await res.json()
       if (!res.ok) { setCreateError(json.error ?? 'Erro ao criar.'); return }
@@ -1197,36 +1387,34 @@ function QuitacaoSubstituicao() {
     setCards(prev => prev.map(c => c.id === cardId ? { ...c, observacao: obs } : c))
   }
 
-  const cfg = creating ? QS_CONFIG[creating] : null
+  const handleRename = (cardId: string, novoNome: string) => {
+    setCards(prev => prev.map(c => c.id === cardId ? { ...c, nome: novoNome } : c))
+  }
+
+  const handleCardUpdate = (cardId: string, fields: Partial<QSCard>) => {
+    setCards(prev => prev.map(c => c.id === cardId ? { ...c, ...fields } : c))
+  }
+
 
   return (
     <div>
       {/* Cabeçalho */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: '#f8fafc', margin: 0 }}>Quitação e Substituição</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: '#f8fafc', margin: 0 }}>{cfg.label}</h2>
           <p style={{ fontSize: 13, color: '#7c6fa0', margin: '2px 0 0' }}>{cards.length} registro{cards.length !== 1 ? 's' : ''}</p>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button
-            onClick={() => openForm('quitacao')}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: 'none', cursor: 'pointer', background: QS_CONFIG.quitacao.gradient, color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="white" strokeWidth="2.2" strokeLinecap="round" /></svg>
-            Nova Quitação
-          </button>
-          <button
-            onClick={() => openForm('substituicao')}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: 'none', cursor: 'pointer', background: QS_CONFIG.substituicao.gradient, color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="white" strokeWidth="2.2" strokeLinecap="round" /></svg>
-            Nova Substituição
-          </button>
-        </div>
+        <button
+          onClick={openForm}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: 'none', cursor: 'pointer', background: cfg.gradient, color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="white" strokeWidth="2.2" strokeLinecap="round" /></svg>
+          + Nova {cfg.label}
+        </button>
       </div>
 
-      {/* Formulário de criação */}
-      {creating && cfg && (
+      {/* Formulário */}
+      {showForm && (
         <form
           onSubmit={handleCreate}
           style={{ background: '#0d0d1f', border: `1px solid ${cfg.border}`, borderRadius: 12, padding: 14, marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 420 }}
@@ -1237,55 +1425,68 @@ function QuitacaoSubstituicao() {
               <label style={{ fontSize: 11, color: '#7c6fa0', display: 'block', marginBottom: 4 }}>Nome</label>
               <input
                 type="text"
-                placeholder={creating === 'quitacao' ? 'Ex: Honda Civic - João Silva' : 'Ex: Toyota Corolla → Honda HRV'}
+                placeholder={tipo === 'quitacao' ? 'Ex: Honda Civic - João Silva' : 'Ex: Toyota Corolla → Honda HRV'}
                 value={nome}
                 onChange={e => setNome(e.target.value)}
                 autoFocus
                 style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${cfg.border}`, background: '#08080f', color: '#f8fafc', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
               />
             </div>
-            <button
-              type="submit"
-              disabled={saving}
-              style={{ padding: '8px 16px', borderRadius: 8, border: 'none', cursor: saving ? 'not-allowed' : 'pointer', background: cfg.gradient, color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', opacity: saving ? 0.7 : 1 }}
-            >
+            <button type="submit" disabled={saving} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', cursor: saving ? 'not-allowed' : 'pointer', background: cfg.gradient, color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Criando...' : 'Criar'}
             </button>
-            <button
-              type="button"
-              onClick={closeForm}
-              style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #1e1b4b', cursor: 'pointer', background: 'transparent', color: '#7c6fa0', fontSize: 13 }}
-            >
-              ✕
-            </button>
+            <button type="button" onClick={closeForm} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #1e1b4b', cursor: 'pointer', background: 'transparent', color: '#7c6fa0', fontSize: 13 }}>✕</button>
           </div>
           {createError && <p style={{ fontSize: 11, color: '#fca5a5', margin: 0 }}>{createError}</p>}
         </form>
       )}
 
-      {/* Grid */}
+      {/* Kanban */}
       {loading ? (
         <p style={{ color: '#7c6fa0', fontSize: 14, textAlign: 'center', padding: 48 }}>Carregando...</p>
-      ) : cards.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px 24px', background: '#0d0d1f', border: '1px dashed #1e1b4b', borderRadius: 14 }}>
-          <svg width="38" height="38" viewBox="0 0 24 24" fill="none" style={{ margin: '0 auto 10px', display: 'block', opacity: 0.3 }}>
-            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="#7c6fa0" strokeWidth="1.5" fill="none" />
-            <path d="M14 2v6h6M16 13H8M16 17H8" stroke="#7c6fa0" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          <p style={{ color: '#7c6fa0', fontSize: 14, margin: 0 }}>Nenhum registro ainda.</p>
-          <p style={{ color: '#4a4568', fontSize: 13, marginTop: 4 }}>Clique em "Nova Quitação" ou "Nova Substituição" para começar.</p>
-        </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12, alignItems: 'start' }}>
-          {cards.map(card => (
-            <QSCardItem
-              key={card.id}
-              card={card}
-              onDelete={handleDelete}
-              onArquivoChange={handleArquivoChange}
-              onObsChange={handleObsChange}
-            />
-          ))}
+        <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 16, alignItems: 'flex-start' }}>
+          {QS_STATUS[tipo].map(status => {
+            const colCards = cards.filter(c => c.status === status.id)
+            return (
+              <div key={status.id} style={{ flexShrink: 0, width: 300, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {/* Cabeçalho da coluna */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 10, background: status.bg, border: `1px solid ${status.border}` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: status.color }} />
+                    <span style={{ fontSize: 12, fontWeight: 700, color: status.color, letterSpacing: '0.03em' }}>{status.label}</span>
+                  </div>
+                  {colCards.length > 0 && (
+                    <span style={{ fontSize: 11, fontWeight: 700, color: status.color, background: 'rgba(0,0,0,0.2)', borderRadius: 99, padding: '1px 7px' }}>
+                      {colCards.length}
+                    </span>
+                  )}
+                </div>
+
+                {/* Cards da coluna */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {colCards.map(card => (
+                    <QSCardItem
+                      key={card.id}
+                      card={card}
+                      onDelete={handleDelete}
+                      onArquivoChange={handleArquivoChange}
+                      onObsChange={handleObsChange}
+                      onRename={handleRename}
+                      onCardUpdate={handleCardUpdate}
+                    />
+                  ))}
+                </div>
+
+                {/* Coluna vazia */}
+                {colCards.length === 0 && (
+                  <div style={{ border: '1px dashed rgba(255,255,255,0.05)', borderRadius: 10, padding: '20px 12px', textAlign: 'center' }}>
+                    <p style={{ color: '#2a2a3f', fontSize: 12, margin: 0 }}>Sem registros</p>
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
@@ -1294,15 +1495,16 @@ function QuitacaoSubstituicao() {
 
 // ─── FloorPlanSection ──────────────────────────────────────────────────────────
 
-type SubPage = 'juros' | 'propostas' | 'quitacao'
+type SubPage = 'juros' | 'propostas' | 'quitacao' | 'substituicao'
 
 export default function FloorPlanSection() {
   const [subPage, setSubPage] = useState<SubPage>('juros')
 
   const SUB_ITEMS: { id: SubPage; label: string }[] = [
-    { id: 'juros',     label: 'Cobrança de Juros'        },
-    { id: 'propostas', label: 'Propostas Floor Plan'      },
-    { id: 'quitacao',  label: 'Quitação e Substituição'   },
+    { id: 'juros',        label: 'Cobrança de Juros'   },
+    { id: 'propostas',    label: 'Propostas Floor Plan' },
+    { id: 'quitacao',     label: 'Quitação'             },
+    { id: 'substituicao', label: 'Substituição'         },
   ]
 
   return (
@@ -1335,10 +1537,11 @@ export default function FloorPlanSection() {
         ))}
       </div>
 
-      {/* Conteúdo */}
-      {subPage === 'juros'     && <CobrancaJuros />}
-      {subPage === 'propostas' && <PropostasFloorPlan />}
-      {subPage === 'quitacao'  && <QuitacaoSubstituicao />}
+      {/* Conteúdo — display:none mantém o estado (collapsed, etc.) ao trocar de aba */}
+      <div style={{ display: subPage === 'juros'        ? 'block' : 'none' }}><CobrancaJuros /></div>
+      <div style={{ display: subPage === 'propostas'    ? 'block' : 'none' }}><PropostasFloorPlan /></div>
+      <div style={{ display: subPage === 'quitacao'     ? 'block' : 'none' }}><QSView tipo="quitacao" /></div>
+      <div style={{ display: subPage === 'substituicao' ? 'block' : 'none' }}><QSView tipo="substituicao" /></div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>

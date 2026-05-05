@@ -24,13 +24,21 @@ export async function PATCH(
   if (!(await hasPermission(userId, 'floorplan'))) return Response.json({ error: 'Acesso negado' }, { status: 403 })
 
   const { id } = await params
-  const { observacao } = await request.json() as { observacao?: string }
+  const body = await request.json() as { observacao?: string; nome?: string; status?: string }
+
+  const updates: Record<string, string> = {}
+  if (body.observacao !== undefined) updates.observacao = body.observacao
+  if (body.status !== undefined) updates.status = body.status
+  if (body.nome !== undefined) {
+    if (!body.nome.trim()) return Response.json({ error: 'Nome não pode ser vazio.' }, { status: 400 })
+    updates.nome = body.nome.trim()
+  }
 
   const { data, error } = await supabase
     .from('quitacao_cards')
-    .update({ observacao: observacao ?? '' })
+    .update(updates)
     .eq('id', id)
-    .select('id, observacao')
+    .select('id, observacao, nome, status')
     .single()
 
   if (error) return Response.json({ error: 'Erro ao atualizar.' }, { status: 500 })

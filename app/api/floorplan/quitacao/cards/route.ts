@@ -15,14 +15,17 @@ async function getUserId(): Promise<string | null> {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const userId = await getUserId()
   if (!userId) return Response.json({ error: 'Não autorizado' }, { status: 401 })
   if (!(await hasPermission(userId, 'floorplan'))) return Response.json({ error: 'Acesso negado' }, { status: 403 })
 
+  const tipo = new URL(request.url).searchParams.get('tipo')
+
   const { data, error } = await supabase
     .from('quitacao_cards')
     .select('*, arquivos:quitacao_arquivos(*)')
+    .eq('tipo', tipo === 'substituicao' ? 'substituicao' : 'quitacao')
     .order('created_at', { ascending: false })
 
   if (error) return Response.json({ error: 'Erro ao buscar cards.' }, { status: 500 })
@@ -43,9 +46,11 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: 'Nome é obrigatório.' }, { status: 400 })
   }
 
+  const defaultStatus = tipo === 'quitacao' ? 'aguardando_pagamento' : 'aguardando_assinatura'
+
   const { data: card, error } = await supabase
     .from('quitacao_cards')
-    .insert({ user_id: userId, tipo, nome: nome.trim() })
+    .insert({ user_id: userId, tipo, nome: nome.trim(), status: defaultStatus })
     .select('*, arquivos:quitacao_arquivos(*)')
     .single()
 
