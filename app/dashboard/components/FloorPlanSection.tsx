@@ -892,16 +892,212 @@ function PropostasFloorPlan() {
   )
 }
 
+// ─── QuitacaoSubstituicao ──────────────────────────────────────────────────────
+
+type QSType = 'quitacao' | 'substituicao'
+
+interface QSCard {
+  id: string
+  tipo: QSType
+  nome: string
+  created_at: string
+}
+
+const QS_CONFIG: Record<QSType, { label: string; color: string; bg: string; border: string; gradient: string }> = {
+  quitacao:    { label: 'Quitação',    color: '#fbbf24', bg: 'rgba(251,191,36,0.10)',  border: 'rgba(251,191,36,0.28)',  gradient: 'linear-gradient(135deg,#d97706,#92400e)' },
+  substituicao:{ label: 'Substituição',color: '#22d3ee', bg: 'rgba(34,211,238,0.10)',  border: 'rgba(34,211,238,0.28)',  gradient: 'linear-gradient(135deg,#0891b2,#164e63)' },
+}
+
+function QSCardItem({ card, onDelete }: { card: QSCard; onDelete: (id: string) => void }) {
+  const [deleting, setDeleting] = useState(false)
+  const cfg = QS_CONFIG[card.tipo]
+
+  const handleDelete = () => {
+    if (!confirm(`Deletar "${card.nome}"?`)) return
+    setDeleting(true)
+    onDelete(card.id)
+  }
+
+  const dateStr = new Date(card.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+
+  return (
+    <div style={{ background: '#0d0d1f', border: `1px solid ${cfg.border}`, borderRadius: 14, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: cfg.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            {card.tipo === 'quitacao' ? (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <path d="M20 6L9 17l-5-5" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            ) : (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <path d="M7 16l-4-4 4-4M17 8l4 4-4 4M14 4l-4 16" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc', margin: 0, wordBreak: 'break-word', lineHeight: 1.2 }}>{card.nome}</p>
+            <p style={{ fontSize: 11, color: '#4a4568', margin: '2px 0 0' }}>{dateStr}</p>
+          </div>
+        </div>
+        <button
+          onClick={handleDelete}
+          disabled={deleting}
+          title="Deletar"
+          style={{ background: 'transparent', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 7, cursor: 'pointer', color: '#fca5a5', display: 'flex', alignItems: 'center', padding: '4px 6px', opacity: deleting ? 0.4 : 1, flexShrink: 0 }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+            <polyline points="3 6 5 6 21 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Badge tipo */}
+      <div>
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: 6, padding: '3px 9px', textTransform: 'uppercase' }}>
+          {cfg.label}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function QuitacaoSubstituicao() {
+  const [cards, setCards] = useState<QSCard[]>([])
+  const [creating, setCreating] = useState<QSType | null>(null)
+  const [nome, setNome] = useState('')
+  const [createError, setCreateError] = useState('')
+
+  const openForm = (tipo: QSType) => {
+    setCreating(tipo)
+    setNome('')
+    setCreateError('')
+  }
+
+  const closeForm = () => {
+    setCreating(null)
+    setNome('')
+    setCreateError('')
+  }
+
+  const handleCreate = (e: React.SyntheticEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (!nome.trim()) { setCreateError('Informe um nome.'); return }
+    const newCard: QSCard = {
+      id: crypto.randomUUID(),
+      tipo: creating!,
+      nome: nome.trim(),
+      created_at: new Date().toISOString(),
+    }
+    setCards(prev => [newCard, ...prev])
+    closeForm()
+  }
+
+  const handleDelete = (id: string) => setCards(prev => prev.filter(c => c.id !== id))
+
+  const cfg = creating ? QS_CONFIG[creating] : null
+
+  return (
+    <div>
+      {/* Cabeçalho */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: '#f8fafc', margin: 0 }}>Quitação e Substituição</h2>
+          <p style={{ fontSize: 13, color: '#7c6fa0', margin: '2px 0 0' }}>{cards.length} registro{cards.length !== 1 ? 's' : ''}</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            onClick={() => openForm('quitacao')}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: 'none', cursor: 'pointer', background: QS_CONFIG.quitacao.gradient, color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+              <path d="M12 5v14M5 12h14" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
+            </svg>
+            Nova Quitação
+          </button>
+          <button
+            onClick={() => openForm('substituicao')}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: 'none', cursor: 'pointer', background: QS_CONFIG.substituicao.gradient, color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+              <path d="M12 5v14M5 12h14" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
+            </svg>
+            Nova Substituição
+          </button>
+        </div>
+      </div>
+
+      {/* Formulário de criação */}
+      {creating && cfg && (
+        <form
+          onSubmit={handleCreate}
+          style={{ background: '#0d0d1f', border: `1px solid ${cfg.border}`, borderRadius: 12, padding: 14, marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 400 }}
+        >
+          <p style={{ fontSize: 13, fontWeight: 600, color: cfg.color, margin: 0 }}>Nova {cfg.label}</p>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 11, color: '#7c6fa0', display: 'block', marginBottom: 4 }}>Nome</label>
+              <input
+                type="text"
+                placeholder={creating === 'quitacao' ? 'Ex: Honda Civic - João Silva' : 'Ex: Toyota Corolla → Honda HRV'}
+                value={nome}
+                onChange={e => setNome(e.target.value)}
+                autoFocus
+                style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${cfg.border}`, background: '#08080f', color: '#f8fafc', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+            <button
+              type="submit"
+              style={{ padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', background: cfg.gradient, color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}
+            >
+              Criar
+            </button>
+            <button
+              type="button"
+              onClick={closeForm}
+              style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #1e1b4b', cursor: 'pointer', background: 'transparent', color: '#7c6fa0', fontSize: 13 }}
+            >
+              ✕
+            </button>
+          </div>
+          {createError && <p style={{ fontSize: 11, color: '#fca5a5', margin: 0 }}>{createError}</p>}
+        </form>
+      )}
+
+      {/* Grid de cards */}
+      {cards.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '48px 24px', background: '#0d0d1f', border: '1px dashed #1e1b4b', borderRadius: 14 }}>
+          <svg width="38" height="38" viewBox="0 0 24 24" fill="none" style={{ margin: '0 auto 10px', display: 'block', opacity: 0.3 }}>
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="#7c6fa0" strokeWidth="1.5" fill="none" />
+            <path d="M14 2v6h6M16 13H8M16 17H8" stroke="#7c6fa0" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          <p style={{ color: '#7c6fa0', fontSize: 14, margin: 0 }}>Nenhum registro ainda.</p>
+          <p style={{ color: '#4a4568', fontSize: 13, marginTop: 4 }}>Clique em "Nova Quitação" ou "Nova Substituição" para começar.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12, alignItems: 'start' }}>
+          {cards.map(card => (
+            <QSCardItem key={card.id} card={card} onDelete={handleDelete} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── FloorPlanSection ──────────────────────────────────────────────────────────
 
-type SubPage = 'juros' | 'propostas'
+type SubPage = 'juros' | 'propostas' | 'quitacao'
 
 export default function FloorPlanSection() {
   const [subPage, setSubPage] = useState<SubPage>('juros')
 
   const SUB_ITEMS: { id: SubPage; label: string }[] = [
-    { id: 'juros',     label: 'Cobrança de Juros'   },
-    { id: 'propostas', label: 'Propostas Floor Plan' },
+    { id: 'juros',     label: 'Cobrança de Juros'        },
+    { id: 'propostas', label: 'Propostas Floor Plan'      },
+    { id: 'quitacao',  label: 'Quitação e Substituição'   },
   ]
 
   return (
@@ -912,7 +1108,7 @@ export default function FloorPlanSection() {
       </div>
 
       {/* Sub-navegação */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 20, borderBottom: '1px solid #1e1b4b', paddingBottom: 12 }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 20, borderBottom: '1px solid #1e1b4b', paddingBottom: 12, flexWrap: 'wrap' }}>
         {SUB_ITEMS.map(item => (
           <button
             key={item.id}
@@ -937,6 +1133,7 @@ export default function FloorPlanSection() {
       {/* Conteúdo */}
       {subPage === 'juros'     && <CobrancaJuros />}
       {subPage === 'propostas' && <PropostasFloorPlan />}
+      {subPage === 'quitacao'  && <QuitacaoSubstituicao />}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
