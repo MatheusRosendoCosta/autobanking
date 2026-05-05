@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { hasPermission } from '@/lib/permissions'
 
 async function getUserId(): Promise<string | null> {
   try {
@@ -20,6 +21,7 @@ export async function PATCH(
 ) {
   const userId = await getUserId()
   if (!userId) return Response.json({ error: 'Não autorizado' }, { status: 401 })
+  if (!(await hasPermission(userId, 'administrativo'))) return Response.json({ error: 'Acesso negado' }, { status: 403 })
 
   const { id } = await params
   const body = await request.json() as { checked_cards?: boolean; checked_carne?: boolean }
@@ -45,21 +47,17 @@ export async function DELETE(
 ) {
   const userId = await getUserId()
   if (!userId) return Response.json({ error: 'Não autorizado' }, { status: 401 })
+  if (!(await hasPermission(userId, 'administrativo'))) return Response.json({ error: 'Acesso negado' }, { status: 403 })
 
   const { id } = await params
 
   const { data: arquivo } = await supabase
     .from('administrativo_arquivos')
-    .select('id, bucket_path, card_id, administrativo_cards!inner(user_id)')
+    .select('id, bucket_path, card_id')
     .eq('id', id)
     .single()
 
   if (!arquivo) return Response.json({ error: 'Arquivo não encontrado.' }, { status: 404 })
-
-  const card = (arquivo.administrativo_cards as unknown as { user_id: string } | null)
-  if (!card || card.user_id !== userId) {
-    return Response.json({ error: 'Não autorizado.' }, { status: 403 })
-  }
 
   await supabase.storage.from('administrativo').remove([arquivo.bucket_path])
 

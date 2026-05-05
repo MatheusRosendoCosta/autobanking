@@ -137,13 +137,14 @@ function FileRow({ arquivo, color, context, onDelete, onCheckChange, readonly }:
 
 // ─── TipoSection ───────────────────────────────────────────────────────────────
 
-function TipoSection({ cardId, tipo, arquivos, context, onUploaded, onDeleted, readonly }: {
+function TipoSection({ cardId, tipo, arquivos, context, onUploaded, onDeleted, onCheckChange, readonly }: {
   cardId: string
   tipo: (typeof TIPOS)[number]
   arquivos: Arquivo[]
   context: 'cards' | 'carne'
   onUploaded?: (a: Arquivo) => void
   onDeleted?: (id: string) => void
+  onCheckChange?: (id: string, checked: boolean) => void
   readonly?: boolean
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -186,7 +187,7 @@ function TipoSection({ cardId, tipo, arquivos, context, onUploaded, onDeleted, r
       {arquivos.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {arquivos.map(a => (
-            <FileRow key={a.id} arquivo={a} color={tipo.color} context={context} onDelete={onDeleted} readonly={readonly} />
+            <FileRow key={a.id} arquivo={a} color={tipo.color} context={context} onDelete={onDeleted} onCheckChange={onCheckChange} readonly={readonly} />
           ))}
         </div>
       )}
@@ -237,12 +238,13 @@ function TipoSection({ cardId, tipo, arquivos, context, onUploaded, onDeleted, r
 
 // ─── CardItem ──────────────────────────────────────────────────────────────────
 
-function CardItem({ card, context, onDelete, onArquivoChange, onToggleCarne, readonly }: {
+function CardItem({ card, context, onDelete, onArquivoChange, onToggleCarne, onCheckChange, readonly }: {
   card: Card
   context: 'cards' | 'carne'
   onDelete?: (id: string) => void
   onArquivoChange?: (cardId: string, arquivo: Arquivo | null, deletedId?: string) => void
   onToggleCarne?: (card: Card) => void
+  onCheckChange?: (id: string, checked: boolean) => void
   readonly?: boolean
 }) {
   const [deleting, setDeleting] = useState(false)
@@ -358,6 +360,7 @@ function CardItem({ card, context, onDelete, onArquivoChange, onToggleCarne, rea
             context={context}
             onUploaded={onArquivoChange ? a => onArquivoChange(card.id, a) : undefined}
             onDeleted={onArquivoChange ? id => onArquivoChange(card.id, null, id) : undefined}
+            onCheckChange={onCheckChange}
             readonly={readonly}
           />
         ))}
@@ -368,9 +371,10 @@ function CardItem({ card, context, onDelete, onArquivoChange, onToggleCarne, rea
 
 // ─── CarneView ─────────────────────────────────────────────────────────────────
 
-function CarneView({ cards, onToggleCarne }: {
+function CarneView({ cards, onToggleCarne, onCheckChange }: {
   cards: Card[]
   onToggleCarne: (card: Card) => void
+  onCheckChange?: (id: string, checked: boolean) => void
 }) {
   const enviados = cards.filter(c => c.enviado_carne)
 
@@ -398,6 +402,7 @@ function CarneView({ cards, onToggleCarne }: {
             card={card}
             context="carne"
             onToggleCarne={onToggleCarne}
+            onCheckChange={onCheckChange}
             readonly
           />
         ))}
@@ -462,6 +467,14 @@ export default function AdministrativoSection() {
 
   const handleToggleCarne = (updated: Card) => {
     setCards(prev => prev.map(c => c.id === updated.id ? { ...c, enviado_carne: updated.enviado_carne } : c))
+  }
+
+  const handleCheckChange = (id: string, checked: boolean, context: 'cards' | 'carne') => {
+    const field = context === 'cards' ? 'checked_cards' : 'checked_carne'
+    setCards(prev => prev.map(c => ({
+      ...c,
+      arquivos: c.arquivos.map(a => a.id === id ? { ...a, [field]: checked } : a),
+    })))
   }
 
   const carneCount = cards.filter(c => c.enviado_carne).length
@@ -554,7 +567,7 @@ export default function AdministrativoSection() {
           <p style={{ color: '#7c6fa0', fontSize: 14 }}>Carregando...</p>
         </div>
       ) : subPage === 'carne' ? (
-        <CarneView cards={cards} onToggleCarne={handleToggleCarne} />
+        <CarneView cards={cards} onToggleCarne={handleToggleCarne} onCheckChange={(id, checked) => handleCheckChange(id, checked, 'carne')} />
       ) : cards.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '48px 24px', background: '#0d0d1f', border: '1px dashed #1e1b4b', borderRadius: 14 }}>
           <svg width="38" height="38" viewBox="0 0 24 24" fill="none" style={{ margin: '0 auto 10px', display: 'block', opacity: 0.3 }}>
@@ -575,6 +588,7 @@ export default function AdministrativoSection() {
               onDelete={handleDelete}
               onArquivoChange={handleArquivoChange}
               onToggleCarne={handleToggleCarne}
+              onCheckChange={(id, checked) => handleCheckChange(id, checked, 'cards')}
             />
           ))}
         </div>
