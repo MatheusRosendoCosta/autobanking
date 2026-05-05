@@ -892,16 +892,417 @@ function PropostasFloorPlan() {
   )
 }
 
+// ─── QuitacaoSubstituicao ──────────────────────────────────────────────────────
+
+type QSType = 'quitacao' | 'substituicao'
+type QSSecao = 'boleto_pix' | 'comprovante' | 'ccb' | 'comprovante_baixa'
+
+interface QSArquivo {
+  id: string
+  card_id: string
+  secao: QSSecao
+  nome: string
+  tamanho: number
+  created_at: string
+}
+
+interface QSCard {
+  id: string
+  tipo: QSType
+  nome: string
+  observacao: string
+  created_at: string
+  arquivos: QSArquivo[]
+}
+
+const QS_CONFIG: Record<QSType, { label: string; color: string; bg: string; border: string; gradient: string }> = {
+  quitacao:    { label: 'Quitação',    color: '#fbbf24', bg: 'rgba(251,191,36,0.10)',  border: 'rgba(251,191,36,0.28)',  gradient: 'linear-gradient(135deg,#d97706,#92400e)' },
+  substituicao:{ label: 'Substituição',color: '#22d3ee', bg: 'rgba(34,211,238,0.10)',  border: 'rgba(34,211,238,0.28)',  gradient: 'linear-gradient(135deg,#0891b2,#164e63)' },
+}
+
+const QS_SECOES: { id: QSSecao; label: string; color: string; bg: string; border: string }[] = [
+  { id: 'boleto_pix',        label: 'Boleto / PIX',            color: '#fbbf24', bg: 'rgba(251,191,36,0.08)',  border: 'rgba(251,191,36,0.20)' },
+  { id: 'comprovante',       label: 'Comprovante de Pagamento', color: '#34d399', bg: 'rgba(52,211,153,0.08)',  border: 'rgba(52,211,153,0.20)' },
+  { id: 'ccb',               label: 'CCB',                     color: '#a78bfa', bg: 'rgba(124,58,237,0.08)',  border: 'rgba(124,58,237,0.20)' },
+  { id: 'comprovante_baixa', label: 'Comprovante Baixa',        color: '#60a5fa', bg: 'rgba(96,165,250,0.08)',  border: 'rgba(96,165,250,0.20)' },
+]
+
+// ─── QSArquivoSection ──────────────────────────────────────────────────────────
+
+function QSArquivoSection({ cardId, secao, arquivos, onUploaded, onDeleted }: {
+  cardId: string
+  secao: (typeof QS_SECOES)[number]
+  arquivos: QSArquivo[]
+  onUploaded: (a: QSArquivo) => void
+  onDeleted: (id: string) => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [dragging, setDragging] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleFile = async (file: File) => {
+    setError('')
+    if (file.type !== 'application/pdf') { setError('Somente PDF.'); return }
+    if (file.size > 20 * 1024 * 1024) { setError('Máximo 20MB.'); return }
+    setUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('secao', secao.id)
+      const res = await fetch(`/api/floorplan/quitacao/cards/${cardId}/upload`, { method: 'POST', body: fd })
+      const json = await res.json()
+      if (!res.ok) { setError(json.error ?? 'Erro ao enviar.'); return }
+      onUploaded(json.arquivo)
+    } catch {
+      setError('Erro de conexão.')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleView = async (id: string) => {
+    const res = await fetch(`/api/floorplan/quitacao/arquivos/${id}/view`)
+    const json = await res.json()
+    if (json.url) window.open(json.url, '_blank')
+  }
+
+  const handleDelete = async (id: string) => {
+    await fetch(`/api/floorplan/quitacao/arquivos/${id}`, { method: 'DELETE' })
+    onDeleted(id)
+  }
+
+  return (
+    <div style={{ background: secao.bg, border: `1px solid ${secao.border}`, borderRadius: 8, padding: '10px 10px 8px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', color: secao.color, textTransform: 'uppercase' }}>
+          {secao.label}
+        </span>
+        {arquivos.length > 0 && (
+          <span style={{ fontSize: 10, color: secao.color, opacity: 0.7 }}>{arquivos.length} arquivo{arquivos.length > 1 ? 's' : ''}</span>
+        )}
+      </div>
+
+      {arquivos.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {arquivos.map(a => (
+            <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.22)', borderRadius: 7, padding: '6px 8px' }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke={secao.color} strokeWidth="1.6" fill="none" />
+                <path d="M14 2v6h6" stroke={secao.color} strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+              <span style={{ flex: 1, fontSize: 11, color: '#f8fafc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.nome}>{a.nome}</span>
+              <span style={{ fontSize: 10, color: '#4a4568', whiteSpace: 'nowrap' }}>{formatSize(a.tamanho)}</span>
+              <button onClick={() => handleView(a.id)} title="Visualizar" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: secao.color, display: 'flex', alignItems: 'center' }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" strokeWidth="1.8" fill="none" /><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" fill="none" /></svg>
+              </button>
+              <button onClick={() => handleDelete(a.id)} title="Remover" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#fca5a5', display: 'flex', alignItems: 'center' }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div
+        onDragOver={e => { e.preventDefault(); setDragging(true) }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={e => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
+        onClick={() => !uploading && inputRef.current?.click()}
+        style={{ border: `1.5px dashed ${dragging ? secao.color : secao.border}`, borderRadius: 6, padding: '7px 10px', display: 'flex', alignItems: 'center', gap: 6, cursor: uploading ? 'not-allowed' : 'pointer', background: dragging ? secao.bg : 'transparent', opacity: uploading ? 0.6 : 1, transition: 'border-color 0.15s' }}
+      >
+        {uploading
+          ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }}><circle cx="12" cy="12" r="9" stroke={secao.color} strokeWidth="2.5" strokeDasharray="28" strokeDashoffset="8" /></svg>
+          : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}><path d="M12 5v14M5 12h14" stroke={secao.color} strokeWidth="2.2" strokeLinecap="round" /></svg>
+        }
+        <span style={{ fontSize: 11, color: '#7c6fa0' }}>{uploading ? 'Enviando...' : 'Adicionar PDF'}</span>
+      </div>
+
+      {error && <p style={{ fontSize: 10, color: '#fca5a5', margin: 0 }}>{error}</p>}
+      <input ref={inputRef} type="file" accept="application/pdf" style={{ display: 'none' }}
+        onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = '' }} />
+    </div>
+  )
+}
+
+// ─── QSCardItem ────────────────────────────────────────────────────────────────
+
+function QSCardItem({ card, onDelete, onArquivoChange, onObsChange }: {
+  card: QSCard
+  onDelete: (id: string) => void
+  onArquivoChange: (cardId: string, arquivo: QSArquivo | null, deletedId?: string) => void
+  onObsChange: (cardId: string, obs: string) => void
+}) {
+  const [deleting, setDeleting] = useState(false)
+  const [observacao, setObservacao] = useState(card.observacao)
+  const [savingObs, setSavingObs] = useState(false)
+  const obsTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const cfg = QS_CONFIG[card.tipo]
+
+  const handleDelete = async () => {
+    if (!confirm(`Deletar "${card.nome}"?`)) return
+    setDeleting(true)
+    try {
+      await fetch(`/api/floorplan/quitacao/cards/${card.id}`, { method: 'DELETE' })
+      onDelete(card.id)
+    } catch { setDeleting(false) }
+  }
+
+  const handleObsChange = (value: string) => {
+    setObservacao(value)
+    onObsChange(card.id, value)
+    if (obsTimer.current) clearTimeout(obsTimer.current)
+    obsTimer.current = setTimeout(async () => {
+      setSavingObs(true)
+      try {
+        await fetch(`/api/floorplan/quitacao/cards/${card.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ observacao: value }),
+        })
+      } finally { setSavingObs(false) }
+    }, 800)
+  }
+
+  const dateStr = new Date(card.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+
+  return (
+    <div style={{ background: '#0d0d1f', border: `1px solid ${cfg.border}`, borderRadius: 14, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: cfg.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            {card.tipo === 'quitacao' ? (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <path d="M20 6L9 17l-5-5" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            ) : (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <path d="M7 16l-4-4 4-4M17 8l4 4-4 4M14 4l-4 16" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc', margin: 0, wordBreak: 'break-word', lineHeight: 1.2 }}>{card.nome}</p>
+            <p style={{ fontSize: 11, color: '#4a4568', margin: '2px 0 0' }}>{dateStr}</p>
+          </div>
+        </div>
+        <button
+          onClick={handleDelete}
+          disabled={deleting}
+          title="Deletar"
+          style={{ background: 'transparent', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 7, cursor: 'pointer', color: '#fca5a5', display: 'flex', alignItems: 'center', padding: '4px 6px', opacity: deleting ? 0.4 : 1, flexShrink: 0 }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+            <polyline points="3 6 5 6 21 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Badge */}
+      <div>
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: 6, padding: '3px 9px', textTransform: 'uppercase' }}>
+          {cfg.label}
+        </span>
+      </div>
+
+      {/* Observação */}
+      <div>
+        <label style={{ fontSize: 11, color: '#7c6fa0', display: 'block', marginBottom: 3 }}>
+          Observação
+          {savingObs && <span style={{ marginLeft: 6, color: '#4a4568' }}>salvando...</span>}
+        </label>
+        <textarea
+          value={observacao}
+          onChange={e => handleObsChange(e.target.value)}
+          rows={2}
+          placeholder="Adicione uma observação..."
+          style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #1e1b4b', background: '#08080f', color: '#f8fafc', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
+        />
+      </div>
+
+      {/* Seções de arquivo (somente quitação) */}
+      {card.tipo === 'quitacao' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {QS_SECOES.map(secao => (
+            <QSArquivoSection
+              key={secao.id}
+              cardId={card.id}
+              secao={secao}
+              arquivos={card.arquivos.filter(a => a.secao === secao.id)}
+              onUploaded={a => onArquivoChange(card.id, a)}
+              onDeleted={id => onArquivoChange(card.id, null, id)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── QuitacaoSubstituicao ──────────────────────────────────────────────────────
+
+function QuitacaoSubstituicao() {
+  const [cards, setCards] = useState<QSCard[]>([])
+  const [loading, setLoading] = useState(true)
+  const [creating, setCreating] = useState<QSType | null>(null)
+  const [nome, setNome] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [createError, setCreateError] = useState('')
+
+  useEffect(() => {
+    fetch('/api/floorplan/quitacao/cards')
+      .then(r => r.json())
+      .then(d => { if (d.cards) setCards(d.cards) })
+      .finally(() => setLoading(false))
+  }, [])
+
+  const openForm = (tipo: QSType) => { setCreating(tipo); setNome(''); setCreateError('') }
+  const closeForm = () => { setCreating(null); setNome(''); setCreateError('') }
+
+  const handleCreate = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (!nome.trim()) { setCreateError('Informe um nome.'); return }
+    setSaving(true)
+    try {
+      const res = await fetch('/api/floorplan/quitacao/cards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo: creating, nome }),
+      })
+      const json = await res.json()
+      if (!res.ok) { setCreateError(json.error ?? 'Erro ao criar.'); return }
+      setCards(prev => [json.card, ...prev])
+      closeForm()
+    } catch {
+      setCreateError('Erro de conexão.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = (id: string) => setCards(prev => prev.filter(c => c.id !== id))
+
+  const handleArquivoChange = (cardId: string, arquivo: QSArquivo | null, deletedId?: string) => {
+    setCards(prev => prev.map(c => {
+      if (c.id !== cardId) return c
+      if (arquivo) return { ...c, arquivos: [...c.arquivos, arquivo] }
+      if (deletedId) return { ...c, arquivos: c.arquivos.filter(a => a.id !== deletedId) }
+      return c
+    }))
+  }
+
+  const handleObsChange = (cardId: string, obs: string) => {
+    setCards(prev => prev.map(c => c.id === cardId ? { ...c, observacao: obs } : c))
+  }
+
+  const cfg = creating ? QS_CONFIG[creating] : null
+
+  return (
+    <div>
+      {/* Cabeçalho */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: '#f8fafc', margin: 0 }}>Quitação e Substituição</h2>
+          <p style={{ fontSize: 13, color: '#7c6fa0', margin: '2px 0 0' }}>{cards.length} registro{cards.length !== 1 ? 's' : ''}</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            onClick={() => openForm('quitacao')}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: 'none', cursor: 'pointer', background: QS_CONFIG.quitacao.gradient, color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="white" strokeWidth="2.2" strokeLinecap="round" /></svg>
+            Nova Quitação
+          </button>
+          <button
+            onClick={() => openForm('substituicao')}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: 'none', cursor: 'pointer', background: QS_CONFIG.substituicao.gradient, color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="white" strokeWidth="2.2" strokeLinecap="round" /></svg>
+            Nova Substituição
+          </button>
+        </div>
+      </div>
+
+      {/* Formulário de criação */}
+      {creating && cfg && (
+        <form
+          onSubmit={handleCreate}
+          style={{ background: '#0d0d1f', border: `1px solid ${cfg.border}`, borderRadius: 12, padding: 14, marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 420 }}
+        >
+          <p style={{ fontSize: 13, fontWeight: 600, color: cfg.color, margin: 0 }}>Nova {cfg.label}</p>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 11, color: '#7c6fa0', display: 'block', marginBottom: 4 }}>Nome</label>
+              <input
+                type="text"
+                placeholder={creating === 'quitacao' ? 'Ex: Honda Civic - João Silva' : 'Ex: Toyota Corolla → Honda HRV'}
+                value={nome}
+                onChange={e => setNome(e.target.value)}
+                autoFocus
+                style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${cfg.border}`, background: '#08080f', color: '#f8fafc', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={saving}
+              style={{ padding: '8px 16px', borderRadius: 8, border: 'none', cursor: saving ? 'not-allowed' : 'pointer', background: cfg.gradient, color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', opacity: saving ? 0.7 : 1 }}
+            >
+              {saving ? 'Criando...' : 'Criar'}
+            </button>
+            <button
+              type="button"
+              onClick={closeForm}
+              style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #1e1b4b', cursor: 'pointer', background: 'transparent', color: '#7c6fa0', fontSize: 13 }}
+            >
+              ✕
+            </button>
+          </div>
+          {createError && <p style={{ fontSize: 11, color: '#fca5a5', margin: 0 }}>{createError}</p>}
+        </form>
+      )}
+
+      {/* Grid */}
+      {loading ? (
+        <p style={{ color: '#7c6fa0', fontSize: 14, textAlign: 'center', padding: 48 }}>Carregando...</p>
+      ) : cards.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '48px 24px', background: '#0d0d1f', border: '1px dashed #1e1b4b', borderRadius: 14 }}>
+          <svg width="38" height="38" viewBox="0 0 24 24" fill="none" style={{ margin: '0 auto 10px', display: 'block', opacity: 0.3 }}>
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="#7c6fa0" strokeWidth="1.5" fill="none" />
+            <path d="M14 2v6h6M16 13H8M16 17H8" stroke="#7c6fa0" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          <p style={{ color: '#7c6fa0', fontSize: 14, margin: 0 }}>Nenhum registro ainda.</p>
+          <p style={{ color: '#4a4568', fontSize: 13, marginTop: 4 }}>Clique em "Nova Quitação" ou "Nova Substituição" para começar.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12, alignItems: 'start' }}>
+          {cards.map(card => (
+            <QSCardItem
+              key={card.id}
+              card={card}
+              onDelete={handleDelete}
+              onArquivoChange={handleArquivoChange}
+              onObsChange={handleObsChange}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── FloorPlanSection ──────────────────────────────────────────────────────────
 
-type SubPage = 'juros' | 'propostas'
+type SubPage = 'juros' | 'propostas' | 'quitacao'
 
 export default function FloorPlanSection() {
   const [subPage, setSubPage] = useState<SubPage>('juros')
 
   const SUB_ITEMS: { id: SubPage; label: string }[] = [
-    { id: 'juros',     label: 'Cobrança de Juros'   },
-    { id: 'propostas', label: 'Propostas Floor Plan' },
+    { id: 'juros',     label: 'Cobrança de Juros'        },
+    { id: 'propostas', label: 'Propostas Floor Plan'      },
+    { id: 'quitacao',  label: 'Quitação e Substituição'   },
   ]
 
   return (
@@ -912,7 +1313,7 @@ export default function FloorPlanSection() {
       </div>
 
       {/* Sub-navegação */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 20, borderBottom: '1px solid #1e1b4b', paddingBottom: 12 }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 20, borderBottom: '1px solid #1e1b4b', paddingBottom: 12, flexWrap: 'wrap' }}>
         {SUB_ITEMS.map(item => (
           <button
             key={item.id}
@@ -937,6 +1338,7 @@ export default function FloorPlanSection() {
       {/* Conteúdo */}
       {subPage === 'juros'     && <CobrancaJuros />}
       {subPage === 'propostas' && <PropostasFloorPlan />}
+      {subPage === 'quitacao'  && <QuitacaoSubstituicao />}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>

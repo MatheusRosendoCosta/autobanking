@@ -56,3 +56,31 @@ CREATE TABLE IF NOT EXISTS public.administrativo_arquivos (
 
 ALTER TABLE public.administrativo_cards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.administrativo_arquivos ENABLE ROW LEVEL SECURITY;
+
+-- ─── Quitação e Substituição ───────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS public.quitacao_cards (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  tipo        TEXT        NOT NULL CHECK (tipo IN ('quitacao', 'substituicao')),
+  nome        TEXT        NOT NULL,
+  observacao  TEXT        NOT NULL DEFAULT '',
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS qs_cards_user_idx ON public.quitacao_cards (user_id);
+
+CREATE TABLE IF NOT EXISTS public.quitacao_arquivos (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  card_id     UUID        NOT NULL REFERENCES public.quitacao_cards(id) ON DELETE CASCADE,
+  secao       TEXT        NOT NULL,
+  nome        TEXT        NOT NULL,
+  bucket_path TEXT        NOT NULL,
+  tamanho     INTEGER     NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS qs_arquivos_card_idx ON public.quitacao_arquivos (card_id);
+
+ALTER TABLE public.quitacao_cards   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.quitacao_arquivos ENABLE ROW LEVEL SECURITY;
