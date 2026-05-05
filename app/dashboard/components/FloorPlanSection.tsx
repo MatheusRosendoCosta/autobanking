@@ -1402,7 +1402,6 @@ function QSView({ tipo }: { tipo: QSType }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 12, flexWrap: 'wrap' }}>
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 700, color: '#f8fafc', margin: 0 }}>{cfg.label}</h2>
-          <p style={{ fontSize: 13, color: '#7c6fa0', margin: '2px 0 0' }}>{cards.length} registro{cards.length !== 1 ? 's' : ''}</p>
         </div>
         <button
           onClick={openForm}
